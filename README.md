@@ -59,7 +59,7 @@ administrador y se puede desmarcar en cualquier momento.
 | Acción | Cómo |
 |---|---|
 | Mover la ventana | Arrastrar desde la barra "Tareas" |
-| Redimensionar | Arrastrar el agarre `◢` de abajo a la derecha |
+| Redimensionar | Arrastrar la franja fina de abajo |
 | Colapsar / expandir | Botón `–`, doble clic en el título, o `Ctrl+Alt+T` |
 | Traer al frente | `Ctrl+Alt+T` |
 | Cerrar | Botón `✕` |
@@ -72,7 +72,7 @@ administrador y se puede desmarcar en cualquier momento.
 | Editar / poner fecha | Clic en la fecha de la tarea (o `＋ fecha`) |
 | Menú completo de una tarea | Clic derecho sobre la tarea |
 | Borrar | Clic en la `✕` que aparece al pasar el mouse por la fila |
-| Opciones (tema, iniciar con Windows) | Botón `⚙` o clic derecho en la barra de título |
+| Opciones (tema, iniciar con Windows, opacidad) | Botón `⚙` o clic derecho en la barra de título |
 
 ### Estética "glass" — límites
 
@@ -162,8 +162,14 @@ pyinstaller --onefile --windowed --name TaskWidget task_widget.py
 
 **Estética**
 
-- Iconos nuevos (`x`, `–`, engranaje, `+`, grip) tomados de **[Lucide](https://lucide.dev)**
-  (licencia ISC), rasterizados a PNG y embebidos — nítidos y con variante para cada tema.
+- **Nueva paleta**: oscuro = negro + amarillo; claro = blanco + azul/celeste.
+- **Inputs con esquinas redondeadas**, igual que la ventana.
+- **Panel de Opciones** (botón `⚙` o clic derecho en la barra): tema, iniciar con
+  Windows y un **slider de opacidad** para el estado sin foco.
+- Se quitó el icono de *grip*: la franja de abajo sigue redimensionando la ventana,
+  sin icono.
+- Iconos (`x`, `–`, engranaje, `+`) tomados de **[Lucide](https://lucide.dev)**
+  (licencia ISC), rasterizados a PNG y embebidos — nítidos y con variante por tema.
 
 ### v3 — 2026-09-04
 
@@ -185,7 +191,7 @@ pyinstaller --onefile --windowed --name TaskWidget task_widget.py
   Al expandir vuelve al nivel escritorio.
 - **Contador por prioridad** en la barra de título: `●2 ●1 ●0` (alta / media / baja),
   cuenta solo las pendientes.
-- **Ventana redimensionable**: agarre `◢` abajo a la derecha. El tamaño (`w`, `h`) se
+- **Ventana redimensionable**: arrastrando la franja fina de abajo. El tamaño (`w`, `h`) se
   guarda en `tasks.json`. La lista scrollea sola y el texto re-ajusta el ancho.
 - Editar la fecha: doble clic (o un clic) sobre la fecha de la tarea; si no tiene,
   muestra `＋ fecha`.
