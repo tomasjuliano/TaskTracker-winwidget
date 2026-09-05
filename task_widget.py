@@ -91,6 +91,59 @@ if IS_WIN:
     u32.GetMonitorInfoW.argtypes = [wintypes.HANDLE, ctypes.POINTER(_MONITORINFO)]
     u32.GetMonitorInfoW.restype = wintypes.BOOL
 
+    # --- estética "liquid glass": acrylic blur + dark mode + esquinas redondeadas ---
+    ACCENT_DISABLED                = 0
+    ACCENT_ENABLE_ACRYLICBLURBEHIND = 4
+    WCA_ACCENT_POLICY              = 19
+    DWMWA_USE_IMMERSIVE_DARK_MODE  = 20
+    DWMWA_WINDOW_CORNER_PREFERENCE = 33
+    DWMWCP_ROUND                   = 2
+
+    class _ACCENTPOLICY(ctypes.Structure):
+        _fields_ = [("AccentState", ctypes.c_uint), ("AccentFlags", ctypes.c_uint),
+                    ("GradientColor", ctypes.c_uint), ("AnimationId", ctypes.c_uint)]
+
+    class _WINCOMPATTR(ctypes.Structure):
+        _fields_ = [("Attribute", ctypes.c_int),
+                    ("Data", ctypes.POINTER(_ACCENTPOLICY)),
+                    ("SizeOfData", ctypes.c_size_t)]
+
+    _set_wca = getattr(u32, "SetWindowCompositionAttribute", None)
+    if _set_wca:
+        _set_wca.argtypes = [wintypes.HWND, ctypes.POINTER(_WINCOMPATTR)]
+        _set_wca.restype = wintypes.BOOL
+    try:
+        _dwm = ctypes.windll.dwmapi
+    except OSError:
+        _dwm = None
+
+
+def win_acrylic(hwnd, gradient_abgr, enabled=True):
+    """Aplica (o quita) el blur acrylic de Windows detrás de la ventana."""
+    if not (IS_WIN and _set_wca and hwnd) or os.environ.get("TW_NOACRYLIC"):
+        return
+    state = ACCENT_ENABLE_ACRYLICBLURBEHIND if enabled else ACCENT_DISABLED
+    pol = _ACCENTPOLICY(state, 0, gradient_abgr & 0xFFFFFFFF, 0)
+    data = _WINCOMPATTR(WCA_ACCENT_POLICY, ctypes.pointer(pol), ctypes.sizeof(pol))
+    try:
+        _set_wca(hwnd, ctypes.byref(data))
+    except OSError:
+        pass
+
+
+def win_dwm_flags(hwnd, dark):
+    """Modo oscuro del marco + esquinas redondeadas (Win11; en Win10 se ignora)."""
+    if not (IS_WIN and _dwm and hwnd):
+        return
+    for attr, val in ((DWMWA_USE_IMMERSIVE_DARK_MODE, 1 if dark else 0),
+                      (DWMWA_WINDOW_CORNER_PREFERENCE, DWMWCP_ROUND)):
+        try:
+            v = ctypes.c_int(val)
+            _dwm.DwmSetWindowAttribute(hwnd, attr, ctypes.byref(v), ctypes.sizeof(v))
+        except OSError:
+            pass
+
+
 # --------------------------------------------------------------------------- #
 #  Persistencia
 # --------------------------------------------------------------------------- #
@@ -99,14 +152,15 @@ APP_DIR = os.path.dirname(os.path.abspath(sys.argv[0] if getattr(sys, "frozen", 
 DATA_FILE = os.path.join(APP_DIR, "tasks.json")
 
 DEFAULT_STATE = {
-    "window": {"x": 120, "y": 120, "w": 310, "h": 340, "collapsed": False, "sized": False},
+    "window": {"x": 120, "y": 120, "w": 310, "h": 340, "collapsed": False,
+               "sized": False, "theme": "auto"},
     "tasks": [],
 }
 
 
 def load_state():
     try:
-        with open(DATA_FILE, "r", encoding="utf-8") as fh:
+        with open(DATA_FILE, "r", encoding="utf-8-sig") as fh:   # tolera BOM de editores
             data = json.load(fh)
         state = {**DEFAULT_STATE, **data}
         state["window"] = {**DEFAULT_STATE["window"], **data.get("window", {})}
@@ -178,20 +232,90 @@ def set_autostart(enable):
 
 
 # --------------------------------------------------------------------------- #
-#  Paleta y helpers
+#  Temas — estética "liquid glass" (claro / oscuro)
 # --------------------------------------------------------------------------- #
+#
+#  tkinter no tiene blur real; el efecto vidrio se logra combinando:
+#   - transparencia de ventana (-alpha)
+#   - acrylic blur de Windows por detrás (SetWindowCompositionAttribute)
+#   - bordes finos luminosos y capas translúcidas en la paleta
+#  Si la API de acrylic falla, queda el tema plano translúcido igual prolijo.
 
-BG        = "#1e1f24"
-BG_HEADER = "#2a2c33"
-BG_ROW    = "#24262c"
-BG_INPUT  = "#2f323a"
-FG        = "#e8e8ea"
-FG_DIM    = "#8a8d96"
-ACCENT    = "#5a9cff"
-OVERDUE   = "#e5534b"
+THEMES = {
+    "dark": {
+        "bg":       "#1f2024",   # cuerpo
+        "header":   "#2b2c31",   # barra superior / inferior (capa "vidrio")
+        "row":      "#303137",   # fila de tarea
+        "row_hi":   "#3a3b42",   # fila hover
+        "input":    "#3b3c44",
+        "fg":       "#f2f2f5",
+        "fg_dim":   "#9a9ba4",
+        "accent":   "#4c9bff",
+        "overdue":  "#ff6b60",
+        "border":   "#54555f",   # hairline
+        "alpha":    0.92,
+        "acrylic":  True,        # el blur real de Windows queda bien en oscuro
+        "tint":     0xDC1F1F24,  # 0xAABBGGRR
+    },
+    "light": {
+        "bg":       "#f4f4f6",
+        "header":   "#eaeaee",
+        "row":      "#ffffff",
+        "row_hi":   "#f0f0f3",
+        "input":    "#ffffff",
+        "fg":       "#1d1d1f",
+        "fg_dim":   "#71717a",
+        "accent":   "#0a84ff",
+        "overdue":  "#d70015",
+        "border":   "#c4c4ce",
+        "alpha":    0.96,        # el acrylic claro se lava sobre fondos claros → solo translucidez
+        "acrylic":  False,
+        "tint":     0x00000000,
+    },
+}
+PRIO_COLORS = {
+    "dark":  {"alta": "#ff6b60", "media": "#ffb340", "baja": "#4ad06a"},
+    "light": {"alta": "#e5342b", "media": "#d98600", "baja": "#28a745"},
+}
+
+# variables "vivas" que lee todo el resto del código; apply_theme() las reescribe
+BG = BG_HEADER = BG_ROW = BG_ROW_HI = BG_INPUT = FG = FG_DIM = ACCENT = OVERDUE = BORDER = None
+PRIO_COLOR = {}
+WIN_ALPHA = 0.9
+WIN_TINT = 0
+WIN_ACRYLIC = False
+
+
+def resolve_theme(choice):
+    if choice in ("dark", "light"):
+        return choice
+    return system_theme()
+
+
+def system_theme():
+    if not IS_WIN:
+        return "dark"
+    try:
+        with winreg.OpenKey(
+            winreg.HKEY_CURRENT_USER,
+            r"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize") as k:
+            return "light" if winreg.QueryValueEx(k, "AppsUseLightTheme")[0] else "dark"
+    except OSError:
+        return "dark"
+
+
+def apply_theme(name):
+    global BG, BG_HEADER, BG_ROW, BG_ROW_HI, BG_INPUT, FG, FG_DIM, ACCENT, OVERDUE, BORDER
+    global PRIO_COLOR, WIN_ALPHA, WIN_TINT, WIN_ACRYLIC
+    t = THEMES[name]
+    BG, BG_HEADER, BG_ROW, BG_ROW_HI = t["bg"], t["header"], t["row"], t["row_hi"]
+    BG_INPUT, FG, FG_DIM = t["input"], t["fg"], t["fg_dim"]
+    ACCENT, OVERDUE, BORDER = t["accent"], t["overdue"], t["border"]
+    PRIO_COLOR = PRIO_COLORS[name]
+    WIN_ALPHA, WIN_TINT, WIN_ACRYLIC = t["alpha"], t["tint"], t["acrylic"]
+
 
 PRIOS = ["baja", "media", "alta"]
-PRIO_COLOR = {"alta": "#e5534b", "media": "#e3b341", "baja": "#3fb950"}
 PRIO_RANK  = {"alta": 0, "media": 1, "baja": 2}
 
 MESES = ["ene", "feb", "mar", "abr", "may", "jun",
@@ -233,9 +357,9 @@ def due_label(iso_str):
     if dias == 0:
         return f"{txt}  ·  hoy", OVERDUE
     if dias == 1:
-        return f"{txt}  ·  mañana", "#e3b341"
+        return f"{txt}  ·  mañana", PRIO_COLOR["media"]
     if dias <= 7:
-        return f"{txt}  ·  en {dias}d", "#e3b341"
+        return f"{txt}  ·  en {dias}d", PRIO_COLOR["media"]
     return f"{txt}  ·  en {dias}d", FG_DIM
 
 
@@ -255,12 +379,17 @@ class TaskWidget:
         self._hwnd = None
         self._editing = False
         self._summon_flag = False
+        self._glass_on = False
+
+        self.win.setdefault("theme", "auto")
+        apply_theme(resolve_theme(self.win["theme"]))
 
         self.root = tk.Tk()
         self.root.title("Tareas")
         self.root.overrideredirect(True)
-        self.root.attributes("-alpha", 0.94)
-        self.root.configure(bg=BG)
+        self.root.attributes("-alpha", WIN_ALPHA)
+        self.root.configure(bg=BG, highlightthickness=1,
+                            highlightbackground=BORDER, highlightcolor=BORDER)
         self.root.geometry(f"{self.win['w']}x{self.win['h']}+{self.win['x']}+{self.win['y']}")
         self.root.protocol("WM_DELETE_WINDOW", self.quit)
 
@@ -271,6 +400,7 @@ class TaskWidget:
         self._autostart_var = tk.BooleanVar(value=autostart_enabled())
         if self._autostart_var.get():
             set_autostart(True)          # re-escribe la ruta actual por si el archivo se movió
+        self._theme_var = tk.StringVar(value=self.win["theme"])
 
         self._build_header()
         self._build_body()
@@ -343,10 +473,18 @@ class TaskWidget:
     def _header_menu(self, event=None):
         m = tk.Menu(self.root, tearoff=0, bg=BG_HEADER, fg=FG,
                     activebackground=ACCENT, activeforeground="#fff", relief="flat")
+
+        tema = tk.Menu(m, tearoff=0, bg=BG_HEADER, fg=FG,
+                       activebackground=ACCENT, activeforeground="#fff")
+        for lbl, val in (("Claro", "light"), ("Oscuro", "dark"), ("Automático", "auto")):
+            tema.add_radiobutton(label=lbl, value=val, variable=self._theme_var,
+                                 command=lambda v=val: self._set_theme(v))
+        m.add_cascade(label="Tema", menu=tema)
+
         if IS_WIN:
             m.add_checkbutton(label="Iniciar con Windows", variable=self._autostart_var,
                               command=self._toggle_autostart)
-            m.add_separator()
+        m.add_separator()
         m.add_command(label="Cerrar", command=self.quit)
         x = event.x_root if event is not None else self.root.winfo_pointerx()
         y = event.y_root if event is not None else self.root.winfo_pointery()
@@ -641,9 +779,66 @@ class TaskWidget:
             self._hwnd = u32.GetAncestor(self.root.winfo_id(), GA_ROOT) or self.root.winfo_id()
             ex = _GWLP(self._hwnd, GWL_EXSTYLE)
             _SWLP(self._hwnd, GWL_EXSTYLE, (ex | WS_EX_TOOLWINDOW) & ~WS_EX_APPWINDOW)
+            self._apply_glass()
             self._send_to_bottom()
         except Exception as exc:
             print("No se pudo fijar al escritorio:", exc)
+
+    # ------------------------------------------------------------------ estética / tema
+    def _apply_glass(self):
+        """Translucidez + acrylic blur + marco acorde al tema."""
+        try:
+            self.root.attributes("-alpha", WIN_ALPHA)
+        except tk.TclError:
+            pass
+        dark = resolve_theme(self.win.get("theme", "auto")) == "dark"
+        win_dwm_flags(self._hwnd, dark)
+        if WIN_ACRYLIC:
+            win_acrylic(self._hwnd, WIN_TINT, enabled=True)
+            self._glass_on = True
+        else:
+            win_acrylic(self._hwnd, WIN_TINT, enabled=False)
+            self._glass_on = False
+
+    def _glass_suppress(self):
+        """Apaga el blur mientras se arrastra/redimensiona (evita tirones en Win10)."""
+        if self._glass_on and IS_WIN and self._hwnd:
+            win_acrylic(self._hwnd, WIN_TINT, enabled=False)
+            self._glass_on = False
+
+    def _glass_resume(self):
+        if WIN_ACRYLIC and not self._glass_on and IS_WIN and self._hwnd:
+            win_acrylic(self._hwnd, WIN_TINT, enabled=True)
+            self._glass_on = True
+
+    def _set_theme(self, choice):
+        self.win["theme"] = choice
+        self._theme_var.set(choice)
+        apply_theme(resolve_theme(choice))
+        keep = ""
+        try:
+            keep = self.e_text.get()
+        except Exception:
+            pass
+        for fr in (self.header, self.body, self.add_bar, self.footer):
+            fr.destroy()
+        self.root.configure(bg=BG, highlightbackground=BORDER, highlightcolor=BORDER)
+        self._build_header()
+        self._build_body()
+        self._build_footer()
+        self._show_expanded()
+        if self.win["collapsed"]:
+            self._collapse(save=False)
+        try:
+            if keep:
+                self._clear_placeholder(self.e_text)
+                self.e_text.insert(0, keep)
+        except Exception:
+            pass
+        self.render()
+        self._apply_glass()
+        self._send_to_bottom()
+        self.save()
 
     def _send_to_bottom(self):
         if IS_WIN and self._hwnd and not self.win["collapsed"]:
@@ -701,6 +896,7 @@ class TaskWidget:
     # ------------------------------------------------------------------ resize
     def _resize_start(self, e):
         self._rs = (e.x_root, e.y_root, self.root.winfo_width(), self.root.winfo_height())
+        self._glass_suppress()
 
     def _resize_move(self, e):
         if not self._rs:
@@ -714,6 +910,7 @@ class TaskWidget:
     def _resize_end(self, e):
         self._rs = None
         self.render()          # recalcula el wraplength de los textos
+        self._glass_resume()
         self.save()
 
     # ------------------------------------------------------------------ util
@@ -738,6 +935,7 @@ class TaskWidget:
 
     def _drag_start(self, e):
         self._drag = (e.x_root - self.root.winfo_x(), e.y_root - self.root.winfo_y())
+        self._glass_suppress()
 
     def _drag_move(self, e):
         x, y = self._clamp_pos(e.x_root - self._drag[0], e.y_root - self._drag[1])
@@ -746,6 +944,7 @@ class TaskWidget:
 
     def _drag_end(self, _e=None):
         self._snap_onscreen()
+        self._glass_resume()
         self.save()
 
     # ------------------------------------------------------------------ mantener en pantalla

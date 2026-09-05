@@ -10,6 +10,8 @@ Un tracker de tareas que vive en el escritorio de Windows. Python + tkinter,
 - Atajo global **`Ctrl+Alt+T`** para traerlo al frente desde cualquier lado.
 - Tareas con fecha de vencimiento y prioridad, contador por prioridad, ventana
   redimensionable.
+- **Tema claro / oscuro / automático**, con estética translúcida tipo *glass*
+  (blur acrylic de Windows por detrás en el tema oscuro).
 - Todo se guarda en `tasks.json`, al lado del script.
 
 ---
@@ -70,7 +72,18 @@ administrador y se puede desmarcar en cualquier momento.
 | Editar / poner fecha | Clic en la fecha de la tarea (o `＋ fecha`) |
 | Menú completo de una tarea | Clic derecho sobre la tarea |
 | Borrar | Clic en la `✕` que aparece al pasar el mouse por la fila |
-| Opciones / Iniciar con Windows | Botón `⚙` o clic derecho en la barra de título |
+| Opciones (tema, iniciar con Windows) | Botón `⚙` o clic derecho en la barra de título |
+
+### Estética "glass" — límites
+
+tkinter no tiene blur nativo. El efecto se arma con transparencia de ventana +
+el *blur acrylic* de Windows (`SetWindowCompositionAttribute`) por detrás. Notas:
+
+- El acrylic sólo se usa en el **tema oscuro**; en claro se lava sobre fondos
+  claros, así que el tema claro es sólo translúcido.
+- Las esquinas quedan rectas: Windows no redondea ventanas sin marco.
+- Si el blur da problemas (parpadeos, lentitud), arrancá con la variable de
+  entorno `TW_NOACRYLIC=1` para desactivarlo y dejar sólo la translucidez.
 
 Las tareas se ordenan solas: pendientes arriba, después por fecha más cercana y
 prioridad. Las atrasadas quedan en rojo. Se guarda en cada cambio y hay autosave
@@ -126,11 +139,15 @@ pyinstaller --onefile --windowed --name TaskWidget task_widget.py
 
 **Nuevo**
 
+- **Tema claro / oscuro / automático** (sigue el de Windows), en el menú `⚙`.
+  Estética translúcida tipo *glass*; en oscuro además usa el blur acrylic de
+  Windows por detrás. Variable `TW_NOACRYLIC=1` para desactivar el blur.
 - Opción **"Iniciar con Windows"** en el menú `⚙` / clic derecho en la barra.
   Usa la clave `Run` del usuario actual (sin permisos de admin); al arrancar
   re-escribe la ruta por si moviste el archivo.
 - **CI en GitHub Actions**: compila `TaskWidget.exe` con PyInstaller en cada push
   y publica un Release con el `.exe` al pushear un tag `vX.Y.Z`.
+- `tasks.json` se lee tolerando BOM (por si lo editás con un editor que lo agrega).
 
 **Arreglos**
 
