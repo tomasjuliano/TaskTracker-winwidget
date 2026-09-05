@@ -506,20 +506,23 @@ class RoundEntry(tk.Frame):
         self.entry = tk.Entry(self.cv, relief="flat", bd=0, highlightthickness=0,
                               bg=self._fill, **entry_kw)
         self._ph = 8 if not small else 6
-        self.entry.place(x=self._ph, rely=0.5, anchor="w")
+        # place() con relwidth/relheight: el Entry sigue solo el tamaño del canvas,
+        # sin que corra código en cada evento de resize.
+        self.entry.place(x=self._ph, rely=0.5, anchor="w",
+                         relwidth=1.0, width=-2 * self._ph,
+                         relheight=1.0, height=-6)
         self.cv.bind("<Configure>", self._redraw)
         self.cv.bind("<Button-1>", lambda e: self.entry.focus_set())
 
     def _redraw(self, e=None):
         w = e.width if e is not None else self.cv.winfo_width()
         h = e.height if e is not None else self.cv.winfo_height()
-        if w < 4 or h < 4:
+        if w < 6 or h < 6:
             return
         self.cv.delete("bg")
         _round_rect(self.cv, 1, 1, w - 1, h - 1, INPUT_RADIUS,
                     fill=self._fill, outline=BORDER, tags="bg")
         self.cv.tag_lower("bg")
-        self.entry.place_configure(width=w - 2 * self._ph, height=max(1, h - 6))
 
 
 def make_icon(parent, name, *, bg, command=None):
@@ -597,6 +600,8 @@ class TaskWidget:
         self.tasks = self.state["tasks"]
         self._drag = (0, 0)
         self._rs = None
+        self._rs_target = None
+        self._rs_pending = None
         self._new_prio = "media"
         self._hwnd = None
         self._editing = False
@@ -766,7 +771,8 @@ class TaskWidget:
         self.canvas.bind("<Configure>", self._on_canvas_configure)
         self.canvas.bind_all("<MouseWheel>", self._on_wheel)
 
-        add = tk.Frame(self.root, bg=BG_HEADER)
+        add = tk.Frame(self.root, bg=BG_HEADER, height=42)
+        add.pack_propagate(False)          # alto fijo: la fila no salta al redimensionar
         self.add_bar = add
 
         # Orden de packing pensado para que al achicar la ventana se comprima SOLO
@@ -1175,24 +1181,33 @@ class TaskWidget:
     # ------------------------------------------------------------------ resize
     def _resize_start(self, e):
         self._rs = (e.x_root, e.y_root, self.root.winfo_width(), self.root.winfo_height())
+        self._rs_target = None
+        self._rs_pending = None
         self._glass_suppress()
 
     def _resize_move(self, e):
         if not self._rs:
             return
         x0, y0, w0, h0 = self._rs
-        w = max(MIN_W, w0 + (e.x_root - x0))
-        h = max(MIN_H, h0 + (e.y_root - y0))
-        if w == self.win["w"] and h == self.win["h"]:
+        self._rs_target = (max(MIN_W, w0 + (e.x_root - x0)),
+                           max(MIN_H, h0 + (e.y_root - y0)))
+        if self._rs_pending is None:                 # coalescer: ~1 cambio por frame
+            self._rs_pending = self.root.after(16, self._apply_resize)
+
+    def _apply_resize(self):
+        self._rs_pending = None
+        if not self._rs or not self._rs_target:
             return
-        self.win["w"], self.win["h"], self.win["sized"] = w, h, True
-        self.root.geometry(f"{w}x{h}")
-        self.root.update_idletasks()      # repinta ya: evita el flash del área nueva sin dibujar
-        for re_ in (getattr(self, "_text_wrap", None), getattr(self, "_due_wrap", None)):
-            if re_ is not None:
-                re_._redraw()
+        w, h = self._rs_target
+        if (w, h) != (self.win["w"], self.win["h"]):
+            self.win["w"], self.win["h"], self.win["sized"] = w, h, True
+            self.root.geometry(f"{w}x{h}")
 
     def _resize_end(self, e):
+        if self._rs_pending is not None:
+            self.root.after_cancel(self._rs_pending)
+            self._rs_pending = None
+        self._apply_resize()
         self._rs = None
         self.render()          # recalcula el wraplength de los textos
         self._glass_resume()
