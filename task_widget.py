@@ -495,28 +495,31 @@ def _round_rect(cv, x0, y0, x1, y1, r, **kw):
 
 
 class RoundEntry(tk.Frame):
-    """Entry con las esquinas redondeadas (fondo dibujado en un Canvas)."""
+    """Entry con las esquinas redondeadas: el fondo se dibuja en un Canvas y el
+    Entry va posicionado encima con place() (sin recrearlo en cada resize)."""
 
     def __init__(self, parent, *, small=False, **entry_kw):
         super().__init__(parent, bg=parent.cget("bg"))
         self._fill = entry_kw.pop("bg", BG_INPUT)
         self.cv = tk.Canvas(self, bg=parent.cget("bg"), highlightthickness=0, bd=0)
         self.cv.pack(fill="both", expand=True)
-        self.entry = tk.Entry(self, relief="flat", bd=0, highlightthickness=0,
+        self.entry = tk.Entry(self.cv, relief="flat", bd=0, highlightthickness=0,
                               bg=self._fill, **entry_kw)
         self._ph = 8 if not small else 6
+        self.entry.place(x=self._ph, rely=0.5, anchor="w")
         self.cv.bind("<Configure>", self._redraw)
+        self.cv.bind("<Button-1>", lambda e: self.entry.focus_set())
 
-    def _redraw(self, _=None):
-        self.cv.delete("all")
-        w = self.cv.winfo_width()
-        h = self.cv.winfo_height()
+    def _redraw(self, e=None):
+        w = e.width if e is not None else self.cv.winfo_width()
+        h = e.height if e is not None else self.cv.winfo_height()
         if w < 4 or h < 4:
             return
+        self.cv.delete("bg")
         _round_rect(self.cv, 1, 1, w - 1, h - 1, INPUT_RADIUS,
-                    fill=self._fill, outline=BORDER)
-        self.cv.create_window(self._ph, h // 2, anchor="w", window=self.entry,
-                              width=w - 2 * self._ph, height=h - 6)
+                    fill=self._fill, outline=BORDER, tags="bg")
+        self.cv.tag_lower("bg")
+        self.entry.place_configure(width=w - 2 * self._ph, height=max(1, h - 6))
 
 
 def make_icon(parent, name, *, bg, command=None):
