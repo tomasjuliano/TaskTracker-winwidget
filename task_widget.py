@@ -152,7 +152,7 @@ APP_DIR = os.path.dirname(os.path.abspath(sys.argv[0] if getattr(sys, "frozen", 
 DATA_FILE = os.path.join(APP_DIR, "tasks.json")
 
 DEFAULT_STATE = {
-    "window": {"x": 120, "y": 120, "w": 310, "h": 340, "collapsed": False,
+    "window": {"x": None, "y": None, "w": 310, "h": 340, "collapsed": False,
                "sized": False, "theme": "auto", "dim_opacity": None},
     "tasks": [],
 }
@@ -610,6 +610,8 @@ class TaskWidget:
         self.root.attributes("-alpha", WIN_ALPHA)
         self.root.configure(bg=BG, highlightthickness=1,
                             highlightbackground=BORDER, highlightcolor=BORDER)
+        if self.win.get("x") is None or self.win.get("y") is None:
+            self.win["x"], self.win["y"] = self._default_pos()   # esquina sup. derecha
         self.root.geometry(f"{self.win['w']}x{self.win['h']}+{self.win['x']}+{self.win['y']}")
         self.root.protocol("WM_DELETE_WINDOW", self.quit)
 
@@ -1246,6 +1248,14 @@ class TaskWidget:
             except OSError:
                 pass
         return self._virtual_rect()
+
+    def _default_pos(self):
+        """Posición inicial: esquina superior derecha del monitor primario, con margen."""
+        margin = 14
+        w = self.win["w"]
+        sw = self.root.winfo_screenwidth()
+        ax, ay, aw, ah = self._work_area_at(sw - 40, 40)
+        return ax + aw - w - margin, ay + margin
 
     def _clamp_pos(self, x, y, keep=90):
         """Durante el arrastre: no dejar que se pierda del área de todos los monitores.

@@ -168,6 +168,8 @@ pyinstaller --onefile --windowed --name TaskWidget task_widget.py
   Windows y un **slider de opacidad** para el estado sin foco.
 - Se quitó el icono de *grip*: la franja de abajo sigue redimensionando la ventana,
   sin icono.
+- En el primer arranque aparece en la **esquina superior derecha** (con un margen
+  al borde); después recuerda dónde lo dejaste.
 - Iconos (`x`, `–`, engranaje, `+`) tomados de **[Lucide](https://lucide.dev)**
   (licencia ISC), rasterizados a PNG y embebidos — nítidos y con variante por tema.
 
