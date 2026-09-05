@@ -157,8 +157,8 @@ pyinstaller --onefile --windowed --name TaskWidget task_widget.py
   al arrancar si había quedado en un monitor que ya no está.
 - El botón **`+`** ya no se recorta al achicar la ventana: ahora se comprime solo
   el campo de texto y los botones fijos conservan su tamaño.
-- El tema oscuro se **atenúa cuando la ventana no tiene foco** (más translúcida y
-  oscura), y vuelve a la normalidad al hacerle clic.
+- **Con foco** el widget es un panel casi opaco (para trabajar); **sin foco** se
+  vuelve translúcido con el blur del escritorio detrás, y se funde con el fondo.
 
 **Estética**
 

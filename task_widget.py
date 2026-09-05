@@ -253,13 +253,12 @@ THEMES = {
         "accent":   "#4c9bff",
         "overdue":  "#ff6b60",
         "border":   "#54555f",   # hairline
-        "alpha":    0.93,        # con foco: vidrio translúcido
-        "alpha_dim": 0.985,      # sin foco: casi opaco (si baja, el fondo claro lo "lava")
-        "acrylic":  True,        # el blur real de Windows queda bien en oscuro
-        "tint":     0xDC1F1F24,  # 0xAABBGGRR — con foco
-        "tint_dim": 0xFF07070A,  # sin foco: negro casi total, tapa el fondo
-        "bg_dim":   "#141519",   # cuerpo cuando no tiene foco
-        "header_dim": "#191a1f",
+        # Con foco: panel sólido y oscuro (para usarlo). Sin foco: vidrio translúcido
+        # con el blur del escritorio detrás (se funde con el fondo).
+        "alpha":    0.985,       # con foco: casi opaco
+        "alpha_dim": 0.82,       # sin foco: translúcido
+        "acrylic":  True,        # blur real de Windows — sólo cuando NO tiene foco
+        "tint":     0xC01F1F24,  # 0xAABBGGRR — tinte del vidrio sin foco
     },
     "light": {
         "bg":       "#f4f4f6",
@@ -272,13 +271,10 @@ THEMES = {
         "accent":   "#0a84ff",
         "overdue":  "#d70015",
         "border":   "#c4c4ce",
-        "alpha":    0.96,        # el acrylic claro se lava sobre fondos claros → solo translucidez
-        "alpha_dim": 0.985,
+        "alpha":    0.985,       # con foco: casi opaco
+        "alpha_dim": 0.88,       # sin foco: translúcido (sin acrylic, se lava en claro)
         "acrylic":  False,
         "tint":     0x00000000,
-        "tint_dim": 0x00000000,
-        "bg_dim":   "#e9e9ec",
-        "header_dim": "#e0e0e4",
     },
 }
 PRIO_COLORS = {
@@ -288,10 +284,9 @@ PRIO_COLORS = {
 
 # variables "vivas" que lee todo el resto del código; apply_theme() las reescribe
 BG = BG_HEADER = BG_ROW = BG_ROW_HI = BG_INPUT = FG = FG_DIM = ACCENT = OVERDUE = BORDER = None
-BG_DIM = BG_HEADER_DIM = None
 PRIO_COLOR = {}
 WIN_ALPHA = WIN_ALPHA_DIM = 0.9
-WIN_TINT = WIN_TINT_DIM = 0
+WIN_TINT = 0
 WIN_ACRYLIC = False
 CUR_THEME = "dark"
 
@@ -316,17 +311,15 @@ def system_theme():
 
 def apply_theme(name):
     global BG, BG_HEADER, BG_ROW, BG_ROW_HI, BG_INPUT, FG, FG_DIM, ACCENT, OVERDUE, BORDER
-    global BG_DIM, BG_HEADER_DIM
-    global PRIO_COLOR, WIN_ALPHA, WIN_ALPHA_DIM, WIN_TINT, WIN_TINT_DIM, WIN_ACRYLIC, CUR_THEME
+    global PRIO_COLOR, WIN_ALPHA, WIN_ALPHA_DIM, WIN_TINT, WIN_ACRYLIC, CUR_THEME
     CUR_THEME = name
     t = THEMES[name]
-    BG_DIM, BG_HEADER_DIM = t["bg_dim"], t["header_dim"]
     BG, BG_HEADER, BG_ROW, BG_ROW_HI = t["bg"], t["header"], t["row"], t["row_hi"]
     BG_INPUT, FG, FG_DIM = t["input"], t["fg"], t["fg_dim"]
     ACCENT, OVERDUE, BORDER = t["accent"], t["overdue"], t["border"]
     PRIO_COLOR = PRIO_COLORS[name]
     WIN_ALPHA, WIN_ALPHA_DIM = t["alpha"], t["alpha_dim"]
-    WIN_TINT, WIN_TINT_DIM = t["tint"], t["tint_dim"]
+    WIN_TINT = t["tint"]
     WIN_ACRYLIC = t["acrylic"]
 
 
@@ -602,7 +595,6 @@ class TaskWidget:
         self._summon_flag = False
         self._glass_on = False
         self._dragging = False
-        self._ui_dimmed = None
 
         self.win.setdefault("theme", "auto")
         apply_theme(resolve_theme(self.win["theme"]))
@@ -1011,8 +1003,8 @@ class TaskWidget:
         self._on_focus_evt()
 
     def _on_focus_evt(self):
-        """Ajusta translucidez, tinte y colores según si la ventana tiene foco.
-        Sin foco → casi opaca y más oscura, para que "se apague"."""
+        """Con foco → panel sólido (casi opaco, sin blur), para trabajar.
+        Sin foco → translúcido con el blur del escritorio detrás, se funde al fondo."""
         if self.win["collapsed"]:
             return
         focused = self._has_focus()
@@ -1020,40 +1012,12 @@ class TaskWidget:
             self.root.attributes("-alpha", WIN_ALPHA if focused else WIN_ALPHA_DIM)
         except tk.TclError:
             pass
-        # Con foco: vidrio (acrylic). Sin foco: se apaga el blur → panel sólido y oscuro.
-        want_glass = focused and WIN_ACRYLIC and not self._dragging
+        want_glass = (not focused) and WIN_ACRYLIC and not self._dragging
         if IS_WIN and self._hwnd:
             win_acrylic(self._hwnd, WIN_TINT, enabled=want_glass)
             self._glass_on = want_glass
-        self._dim_ui(not focused)
         if not focused:
             self._maybe_lower()
-
-    def _dim_ui(self, dim):
-        """Recolorea los fondos (barras y cuerpo) cuando la ventana pierde el foco."""
-        if getattr(self, "_ui_dimmed", None) == dim:
-            return
-        self._ui_dimmed = dim
-        body = BG_DIM if dim else BG
-        head = BG_HEADER_DIM if dim else BG_HEADER
-        try:
-            self.root.configure(bg=body)
-        except tk.TclError:
-            pass
-        for cont, cbg, deep in ((self.header, head, True), (self.add_bar, head, True),
-                                (self.footer, head, True), (self.body, body, False),
-                                (self.canvas, body, False), (self.list_frame, body, False)):
-            self._recolor(cont, cbg, deep)
-
-    def _recolor(self, w, bg, deep):
-        try:
-            if w.winfo_class() in ("Frame", "Label", "Canvas"):
-                w.configure(bg=bg)
-        except tk.TclError:
-            pass
-        if deep:
-            for ch in w.winfo_children():
-                self._recolor(ch, bg, deep)
 
     def _glass_suppress(self):
         """Apaga el blur mientras se arrastra/redimensiona (evita tirones en Win10)."""
@@ -1091,7 +1055,6 @@ class TaskWidget:
         except Exception:
             pass
         self.render()
-        self._ui_dimmed = None        # frames nuevos: forzar re-evaluación del dim
         self._apply_glass()
         self._send_to_bottom()
         self.save()
