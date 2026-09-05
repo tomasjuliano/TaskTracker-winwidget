@@ -47,8 +47,10 @@ mensajes de error o el aviso de "Ctrl+Alt+T ya está en uso".
 
 ### Para que arranque con Windows
 
-Poné un acceso directo a `pythonw <ruta>\task_widget.py` en la carpeta de inicio
-(`Win+R` → `shell:startup`).
+Botón **`⚙`** en la barra (o clic derecho en la barra) → **"Iniciar con Windows"**.
+Escribe una entrada en `HKCU\...\CurrentVersion\Run` apuntando al `.exe` (o a
+`pythonw task_widget.py` si lo corrés desde el código). No necesita permisos de
+administrador y se puede desmarcar en cualquier momento.
 
 ### Controles
 
@@ -66,8 +68,9 @@ Poné un acceso directo a `pythonw <ruta>\task_widget.py` en la carpeta de inici
 | Cambiar prioridad de una tarea | Clic en el `●` de la fila |
 | Editar texto | Doble clic en el texto de la tarea |
 | Editar / poner fecha | Clic en la fecha de la tarea (o `＋ fecha`) |
-| Menú completo | Clic derecho sobre la tarea |
+| Menú completo de una tarea | Clic derecho sobre la tarea |
 | Borrar | Clic en la `✕` que aparece al pasar el mouse por la fila |
+| Opciones / Iniciar con Windows | Botón `⚙` o clic derecho en la barra de título |
 
 Las tareas se ordenan solas: pendientes arriba, después por fecha más cercana y
 prioridad. Las atrasadas quedan en rojo. Se guarda en cada cambio y hay autosave
@@ -118,6 +121,16 @@ pyinstaller --onefile --windowed --name TaskWidget task_widget.py
 ---
 
 ## Changelog
+
+### v4 — 2026-09-05
+
+**Nuevo**
+
+- Opción **"Iniciar con Windows"** en el menú `⚙` / clic derecho en la barra.
+  Usa la clave `Run` del usuario actual (sin permisos de admin); al arrancar
+  re-escribe la ruta por si moviste el archivo.
+- **CI en GitHub Actions**: compila `TaskWidget.exe` con PyInstaller en cada push
+  y publica un Release con el `.exe` al pushear un tag `vX.Y.Z`.
 
 ### v3 — 2026-09-04
 

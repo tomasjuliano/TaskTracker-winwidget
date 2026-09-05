@@ -8,6 +8,7 @@ Task Widget - un tracker de tareas para el escritorio de Windows.
 - Atajo global  Ctrl + Alt + T  para traerlo al frente desde cualquier lado.
 - Ventana redimensionable (agarre "◢" abajo a la derecha).
 - Editar: doble clic en el texto o en la fecha de una tarea; clic derecho = menú.
+- Botón "⚙" (o clic derecho en la barra): "Iniciar con Windows".
 - Todo se guarda en tasks.json, al lado de este archivo.
 
 Requisitos: solo Python 3.8+ (tkinter viene con el instalador de Windows).
@@ -24,6 +25,8 @@ import tkinter as tk
 from tkinter import font as tkfont
 
 IS_WIN = sys.platform == "win32"
+if IS_WIN:
+    import winreg
 if IS_WIN:
     import ctypes
     from ctypes import wintypes
@@ -98,6 +101,57 @@ def save_state(state):
         os.replace(tmp, DATA_FILE)
     except OSError as exc:
         print("No se pudo guardar:", exc)
+
+
+# --------------------------------------------------------------------------- #
+#  Iniciar con Windows (clave Run del usuario actual, sin permisos de admin)
+# --------------------------------------------------------------------------- #
+
+RUN_KEY  = r"Software\Microsoft\Windows\CurrentVersion\Run"
+RUN_NAME = "TaskTrackerWidget"
+
+
+def _startup_command():
+    """Comando que Windows ejecuta al iniciar sesión."""
+    if getattr(sys, "frozen", False):            # ejecutable de PyInstaller
+        return f'"{sys.executable}"'
+    # corriendo como script: preferir pythonw.exe (sin consola)
+    pyw = os.path.join(os.path.dirname(sys.executable), "pythonw.exe")
+    launcher = pyw if os.path.exists(pyw) else sys.executable
+    return f'"{launcher}" "{os.path.abspath(__file__)}"'
+
+
+def autostart_enabled():
+    if not IS_WIN:
+        return False
+    try:
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, RUN_KEY) as k:
+            winreg.QueryValueEx(k, RUN_NAME)
+        return True
+    except FileNotFoundError:
+        return False
+    except OSError:
+        return False
+
+
+def set_autostart(enable):
+    """Devuelve True si quedó en el estado pedido."""
+    if not IS_WIN:
+        return False
+    try:
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, RUN_KEY, 0,
+                            winreg.KEY_SET_VALUE) as k:
+            if enable:
+                winreg.SetValueEx(k, RUN_NAME, 0, winreg.REG_SZ, _startup_command())
+            else:
+                try:
+                    winreg.DeleteValue(k, RUN_NAME)
+                except FileNotFoundError:
+                    pass
+        return True
+    except OSError as exc:
+        print("No se pudo cambiar 'Iniciar con Windows':", exc)
+        return False
 
 
 # --------------------------------------------------------------------------- #
@@ -191,6 +245,10 @@ class TaskWidget:
         self.f_body  = tkfont.Font(family="Segoe UI", size=10)
         self.f_small = tkfont.Font(family="Segoe UI", size=8)
 
+        self._autostart_var = tk.BooleanVar(value=autostart_enabled())
+        if self._autostart_var.get():
+            set_autostart(True)          # re-escribe la ruta actual por si el archivo se movió
+
         self._build_header()
         self._build_body()
         self._build_footer()
@@ -233,6 +291,14 @@ class TaskWidget:
         btn_col.bind("<Button-1>", lambda e: self.toggle_collapse())
         self._tooltip(btn_col, "Colapsar / expandir  ·  atajo global: Ctrl+Alt+T")
 
+        btn_cfg = tk.Label(h, text="⚙", bg=BG_HEADER, fg=FG_DIM, font=self.f_title,
+                           cursor="hand2")
+        btn_cfg.pack(side="right", padx=2)
+        btn_cfg.bind("<Button-1>", self._header_menu)
+        btn_cfg.bind("<Enter>", lambda e: btn_cfg.config(fg=FG))
+        btn_cfg.bind("<Leave>", lambda e: btn_cfg.config(fg=FG_DIM))
+        self._tooltip(btn_cfg, "Opciones (también con clic derecho en la barra)")
+
         # contador discreto por prioridad (tareas pendientes)
         cnt = tk.Frame(h, bg=BG_HEADER)
         cnt.pack(side="right", padx=8)
@@ -246,7 +312,28 @@ class TaskWidget:
         for w in (h, title):
             w.bind("<Button-1>", self._drag_start)
             w.bind("<B1-Motion>", self._drag_move)
+            w.bind("<Button-3>", self._header_menu)
         title.bind("<Double-Button-1>", lambda e: self.toggle_collapse())
+
+    def _header_menu(self, event=None):
+        m = tk.Menu(self.root, tearoff=0, bg=BG_HEADER, fg=FG,
+                    activebackground=ACCENT, activeforeground="#fff", relief="flat")
+        if IS_WIN:
+            m.add_checkbutton(label="Iniciar con Windows", variable=self._autostart_var,
+                              command=self._toggle_autostart)
+            m.add_separator()
+        m.add_command(label="Cerrar", command=self.quit)
+        x = event.x_root if event is not None else self.root.winfo_pointerx()
+        y = event.y_root if event is not None else self.root.winfo_pointery()
+        try:
+            m.tk_popup(x, y)
+        finally:
+            m.grab_release()
+
+    def _toggle_autostart(self):
+        want = self._autostart_var.get()
+        if not set_autostart(want):
+            self._autostart_var.set(not want)      # falló: dejar el check como estaba
 
     def _build_body(self):
         self.body = tk.Frame(self.root, bg=BG)
