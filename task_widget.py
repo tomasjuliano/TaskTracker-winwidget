@@ -68,6 +68,29 @@ if IS_WIN:
     _SWLP.argtypes = [wintypes.HWND, ctypes.c_int, ctypes.c_ssize_t]
     _SWLP.restype = ctypes.c_ssize_t
 
+    # --- multi-monitor: para no perder la ventana fuera de pantalla ---
+    SM_XVIRTUALSCREEN, SM_YVIRTUALSCREEN  = 76, 77
+    SM_CXVIRTUALSCREEN, SM_CYVIRTUALSCREEN = 78, 79
+    MONITOR_DEFAULTTONEAREST = 2
+    u32.GetSystemMetrics.argtypes = [ctypes.c_int]
+    u32.GetSystemMetrics.restype = ctypes.c_int
+
+    class _RECT(ctypes.Structure):
+        _fields_ = [("left", ctypes.c_long), ("top", ctypes.c_long),
+                    ("right", ctypes.c_long), ("bottom", ctypes.c_long)]
+
+    class _MONITORINFO(ctypes.Structure):
+        _fields_ = [("cbSize", ctypes.c_ulong), ("rcMonitor", _RECT),
+                    ("rcWork", _RECT), ("dwFlags", ctypes.c_ulong)]
+
+    class _POINT(ctypes.Structure):
+        _fields_ = [("x", ctypes.c_long), ("y", ctypes.c_long)]
+
+    u32.MonitorFromPoint.argtypes = [_POINT, ctypes.c_ulong]
+    u32.MonitorFromPoint.restype = wintypes.HANDLE
+    u32.GetMonitorInfoW.argtypes = [wintypes.HANDLE, ctypes.POINTER(_MONITORINFO)]
+    u32.GetMonitorInfoW.restype = wintypes.BOOL
+
 # --------------------------------------------------------------------------- #
 #  Persistencia
 # --------------------------------------------------------------------------- #
@@ -261,6 +284,7 @@ class TaskWidget:
 
         self.root.bind("<FocusOut>", lambda e: self.root.after(250, self._maybe_lower))
         self.root.after(350, self._pin_to_desktop)
+        self.root.after(500, self._snap_onscreen)   # recupera la ventana si quedó fuera de pantalla
         self.root.after(30000, self._autosave)
         self.root.after(4000, self._keep_low)
 
@@ -312,6 +336,7 @@ class TaskWidget:
         for w in (h, title):
             w.bind("<Button-1>", self._drag_start)
             w.bind("<B1-Motion>", self._drag_move)
+            w.bind("<ButtonRelease-1>", self._drag_end)
             w.bind("<Button-3>", self._header_menu)
         title.bind("<Double-Button-1>", lambda e: self.toggle_collapse())
 
@@ -711,8 +736,61 @@ class TaskWidget:
         self._drag = (e.x_root - self.root.winfo_x(), e.y_root - self.root.winfo_y())
 
     def _drag_move(self, e):
-        x = e.x_root - self._drag[0]
-        y = e.y_root - self._drag[1]
+        x, y = self._clamp_pos(e.x_root - self._drag[0], e.y_root - self._drag[1])
+        self.root.geometry(f"+{x}+{y}")
+        self.win["x"], self.win["y"] = x, y
+
+    def _drag_end(self, _e=None):
+        self._snap_onscreen()
+        self.save()
+
+    # ------------------------------------------------------------------ mantener en pantalla
+    def _virtual_rect(self):
+        """Rectángulo que abarca TODOS los monitores (x, y, w, h)."""
+        if IS_WIN:
+            try:
+                return (u32.GetSystemMetrics(SM_XVIRTUALSCREEN),
+                        u32.GetSystemMetrics(SM_YVIRTUALSCREEN),
+                        u32.GetSystemMetrics(SM_CXVIRTUALSCREEN),
+                        u32.GetSystemMetrics(SM_CYVIRTUALSCREEN))
+            except OSError:
+                pass
+        return (0, 0, self.root.winfo_screenwidth(), self.root.winfo_screenheight())
+
+    def _work_area_at(self, px, py):
+        """Área útil (sin barra de tareas) del monitor que contiene el punto."""
+        if IS_WIN:
+            try:
+                mon = u32.MonitorFromPoint(_POINT(int(px), int(py)),
+                                           MONITOR_DEFAULTTONEAREST)
+                mi = _MONITORINFO()
+                mi.cbSize = ctypes.sizeof(_MONITORINFO)
+                if u32.GetMonitorInfoW(mon, ctypes.byref(mi)):
+                    r = mi.rcWork
+                    return (r.left, r.top, r.right - r.left, r.bottom - r.top)
+            except OSError:
+                pass
+        return self._virtual_rect()
+
+    def _clamp_pos(self, x, y, keep=90):
+        """Durante el arrastre: no dejar que se pierda del área de todos los monitores.
+        Deja pasar el movimiento entre pantallas, pero siempre con una parte visible."""
+        vx, vy, vw, vh = self._virtual_rect()
+        w = self.root.winfo_width()
+        hh = self.header.winfo_height() or 30
+        keep = min(keep, w)
+        x = max(vx - (w - keep), min(x, vx + vw - keep))     # franja horizontal visible
+        y = max(vy, min(y, vy + vh - hh))                    # barra de título siempre visible
+        return x, y
+
+    def _snap_onscreen(self):
+        """Al soltar (o al arrancar): meter la ventana entera dentro de un monitor."""
+        w, h = self.root.winfo_width(), self.root.winfo_height()
+        cx = self.root.winfo_x() + w // 2
+        cy = self.root.winfo_y() + h // 2
+        ax, ay, aw, ah = self._work_area_at(cx, cy)
+        x = max(ax, min(self.root.winfo_x(), ax + aw - w)) if w <= aw else ax
+        y = max(ay, min(self.root.winfo_y(), ay + ah - h)) if h <= ah else ay
         self.root.geometry(f"+{x}+{y}")
         self.win["x"], self.win["y"] = x, y
 

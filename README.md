@@ -132,6 +132,13 @@ pyinstaller --onefile --windowed --name TaskWidget task_widget.py
 - **CI en GitHub Actions**: compila `TaskWidget.exe` con PyInstaller en cada push
   y publica un Release con el `.exe` al pushear un tag `vX.Y.Z`.
 
+**Arreglos**
+
+- La ventana **ya no se puede arrastrar fuera de la pantalla**. Durante el arrastre
+  siempre queda una parte visible; al soltar se acomoda entera dentro del monitor.
+  Funciona con varios monitores (se puede mover entre ellos) y recupera la ventana
+  al arrancar si había quedado en un monitor que ya no está.
+
 ### v3 — 2026-09-04
 
 **Arreglos**
