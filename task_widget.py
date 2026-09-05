@@ -378,28 +378,32 @@ class TaskWidget:
         add = tk.Frame(self.root, bg=BG_HEADER)
         self.add_bar = add
 
+        # Orden de packing pensado para que al achicar la ventana se comprima SOLO
+        # el campo de texto: los botones fijos se packean primero y conservan su
+        # tamaño; el Entry (width=1 + expand) absorbe todo el cambio de ancho.
         self.prio_dot = tk.Label(add, text="●", bg=BG_HEADER, fg=PRIO_COLOR[self._new_prio],
-                                 font=self.f_body, cursor="hand2")
-        self.prio_dot.pack(side="left", padx=(8, 4), pady=6)
+                                 font=self.f_body, cursor="hand2", width=2)
+        self.prio_dot.pack(side="left", padx=(6, 2), pady=6)
         self.prio_dot.bind("<Button-1>", self._cycle_new_prio)
         self._tooltip(self.prio_dot, "Prioridad de la nueva tarea (clic para cambiar)")
 
-        self.e_text = tk.Entry(add, bg=BG_INPUT, fg=FG, insertbackground=FG,
-                               relief="flat", font=self.f_body)
-        self.e_text.pack(side="left", fill="x", expand=True, ipady=3, pady=6)
-        self.e_text.bind("<Return>", lambda e: self.add_task())
+        btn_add = tk.Label(add, text="+", bg=ACCENT, fg="#ffffff", width=2,
+                           font=self.f_title, cursor="hand2")
+        btn_add.pack(side="right", padx=(4, 6), pady=6, ipady=1)
+        btn_add.bind("<Button-1>", lambda e: self.add_task())
+        self._tooltip(btn_add, "Agregar tarea (Enter)")
 
         self.e_due = tk.Entry(add, bg=BG_INPUT, fg=FG_DIM, insertbackground=FG,
-                              relief="flat", font=self.f_small, width=8, justify="center")
-        self.e_due.pack(side="left", padx=4, ipady=4, pady=6)
+                              relief="flat", font=self.f_small, width=7, justify="center")
+        self.e_due.pack(side="right", padx=2, ipady=4, pady=6)
         self._placeholder(self.e_due, "venc.")
         self._limit_to_date(self.e_due)
         self.e_due.bind("<Return>", lambda e: self.add_task())
 
-        btn_add = tk.Label(add, text="  +  ", bg=ACCENT, fg="#ffffff",
-                           font=self.f_title, cursor="hand2")
-        btn_add.pack(side="left", padx=8, pady=6)
-        btn_add.bind("<Button-1>", lambda e: self.add_task())
+        self.e_text = tk.Entry(add, bg=BG_INPUT, fg=FG, insertbackground=FG,
+                               relief="flat", font=self.f_body, width=1)
+        self.e_text.pack(side="left", fill="x", expand=True, padx=(0, 2), ipady=3, pady=6)
+        self.e_text.bind("<Return>", lambda e: self.add_task())
 
     def _build_footer(self):
         f = tk.Frame(self.root, bg=BG_HEADER, height=13)
