@@ -787,6 +787,7 @@ class TaskWidget:
         due_wrap.configure(width=62, height=27)
         due_wrap.pack_propagate(False)
         due_wrap.pack(side="right", padx=2, pady=6)
+        self._due_wrap = due_wrap
         self.e_due = due_wrap.entry
         self._placeholder(self.e_due, "venc.")
         self._limit_to_date(self.e_due)
@@ -797,6 +798,7 @@ class TaskWidget:
         text_wrap.configure(height=29)
         text_wrap.pack_propagate(False)
         text_wrap.pack(side="left", fill="x", expand=True, padx=(2, 2), pady=6)
+        self._text_wrap = text_wrap
         self.e_text = text_wrap.entry
         self.e_text.bind("<Return>", lambda e: self.add_task())
 
@@ -1181,8 +1183,14 @@ class TaskWidget:
         x0, y0, w0, h0 = self._rs
         w = max(MIN_W, w0 + (e.x_root - x0))
         h = max(MIN_H, h0 + (e.y_root - y0))
+        if w == self.win["w"] and h == self.win["h"]:
+            return
         self.win["w"], self.win["h"], self.win["sized"] = w, h, True
         self.root.geometry(f"{w}x{h}")
+        self.root.update_idletasks()      # repinta ya: evita el flash del área nueva sin dibujar
+        for re_ in (getattr(self, "_text_wrap", None), getattr(self, "_due_wrap", None)):
+            if re_ is not None:
+                re_._redraw()
 
     def _resize_end(self, e):
         self._rs = None
