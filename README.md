@@ -14,7 +14,20 @@ Un tracker de tareas que vive en el escritorio de Windows. Python + tkinter,
 
 ---
 
-## Requisitos
+## Descargar (sin instalar nada)
+
+Bajá **`TaskWidget.exe`** de la [página de Releases](../../releases/latest) y hacé
+doble clic. No necesita Python ni instalación. El archivo `tasks.json` se crea al
+lado del `.exe` en el primer arranque.
+
+> Windows Defender / SmartScreen puede avisar que es de un "editor desconocido"
+> (pasa con todo `.exe` sin firma digital): *Más información → Ejecutar de todas formas*.
+> Algunos antivirus dan falso positivo con ejecutables de PyInstaller.
+
+El `.exe` lo compila solo GitHub Actions en cada release — ver
+[Build / CI](#build--ci) más abajo.
+
+## Requisitos (para correrlo desde el código)
 
 - Windows 10 / 11
 - Python 3.8 o superior ([python.org](https://www.python.org/downloads/) — marcar
@@ -67,6 +80,40 @@ cada 30 s; recuerda posición, tamaño y estado de la ventana.
 | `task_widget.py` | La aplicación. Un solo archivo. |
 | `tasks.json` | Tus tareas + geometría de la ventana. Local, **fuera del repo** (`.gitignore`). La app lo crea en el primer arranque. |
 | `README.md` | Este archivo. |
+| `.github/workflows/build.yml` | CI: compila el `.exe` en cada push y publica el Release en los tags. |
+
+---
+
+## Build / CI
+
+GitHub Actions (`.github/workflows/build.yml`) compila el ejecutable con
+**PyInstaller** en un runner de Windows.
+
+- **En cada push / PR a `main`**: compila y sube `TaskWidget.exe` como *artifact*
+  de la corrida (pestaña **Actions** del repo → la corrida → *Artifacts*).
+  Sirve para probar; el artifact se borra a los 90 días.
+- **En un tag `vX.Y.Z`**: además crea un **Release** con el `.exe` adjunto y notas
+  autogeneradas. Eso es lo que baja la gente.
+
+### Sacar una versión nueva
+
+```bash
+# 1. actualizá el Changelog del README y commiteá
+git add README.md task_widget.py
+git commit -m "release v4"
+
+# 2. tag + push  →  Actions compila y publica el Release solo
+git tag v4.0.0
+git push --tags
+```
+
+Compilar a mano localmente (si querés probar el `.exe` sin esperar a Actions):
+
+```bash
+pip install pyinstaller
+pyinstaller --onefile --windowed --name TaskWidget task_widget.py
+# queda en dist/TaskWidget.exe
+```
 
 ---
 
