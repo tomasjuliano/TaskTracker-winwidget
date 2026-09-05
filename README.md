@@ -157,6 +157,13 @@ pyinstaller --onefile --windowed --name TaskWidget task_widget.py
   al arrancar si había quedado en un monitor que ya no está.
 - El botón **`+`** ya no se recorta al achicar la ventana: ahora se comprime solo
   el campo de texto y los botones fijos conservan su tamaño.
+- El tema oscuro se **atenúa cuando la ventana no tiene foco** (más translúcida y
+  oscura), y vuelve a la normalidad al hacerle clic.
+
+**Estética**
+
+- Iconos nuevos (`x`, `–`, engranaje, `+`, grip) tomados de **[Lucide](https://lucide.dev)**
+  (licencia ISC), rasterizados a PNG y embebidos — nítidos y con variante para cada tema.
 
 ### v3 — 2026-09-04
 
@@ -218,3 +225,9 @@ Primera versión.
 - **Persistencia** en `tasks.json` (guardado en cada cambio + autosave cada 30 s).
   Recuerda la posición de la ventana y si está colapsada.
 - Botón `–` para colapsar a solo la barra de título; `✕` para cerrar.
+
+---
+
+## Créditos
+
+Iconos: [Lucide](https://lucide.dev) — licencia ISC (© Lucide Contributors).

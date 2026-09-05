@@ -253,9 +253,11 @@ THEMES = {
         "accent":   "#4c9bff",
         "overdue":  "#ff6b60",
         "border":   "#54555f",   # hairline
-        "alpha":    0.92,
+        "alpha":    0.93,        # con foco
+        "alpha_dim": 0.80,       # sin foco: más translúcido/oscuro
         "acrylic":  True,        # el blur real de Windows queda bien en oscuro
-        "tint":     0xDC1F1F24,  # 0xAABBGGRR
+        "tint":     0xDC1F1F24,  # 0xAABBGGRR — con foco
+        "tint_dim": 0xF00C0C10,  # sin foco: casi negro, más opaco
     },
     "light": {
         "bg":       "#f4f4f6",
@@ -269,8 +271,10 @@ THEMES = {
         "overdue":  "#d70015",
         "border":   "#c4c4ce",
         "alpha":    0.96,        # el acrylic claro se lava sobre fondos claros → solo translucidez
+        "alpha_dim": 0.90,
         "acrylic":  False,
         "tint":     0x00000000,
+        "tint_dim": 0x00000000,
     },
 }
 PRIO_COLORS = {
@@ -281,9 +285,10 @@ PRIO_COLORS = {
 # variables "vivas" que lee todo el resto del código; apply_theme() las reescribe
 BG = BG_HEADER = BG_ROW = BG_ROW_HI = BG_INPUT = FG = FG_DIM = ACCENT = OVERDUE = BORDER = None
 PRIO_COLOR = {}
-WIN_ALPHA = 0.9
-WIN_TINT = 0
+WIN_ALPHA = WIN_ALPHA_DIM = 0.9
+WIN_TINT = WIN_TINT_DIM = 0
 WIN_ACRYLIC = False
+CUR_THEME = "dark"
 
 
 def resolve_theme(choice):
@@ -306,17 +311,226 @@ def system_theme():
 
 def apply_theme(name):
     global BG, BG_HEADER, BG_ROW, BG_ROW_HI, BG_INPUT, FG, FG_DIM, ACCENT, OVERDUE, BORDER
-    global PRIO_COLOR, WIN_ALPHA, WIN_TINT, WIN_ACRYLIC
+    global PRIO_COLOR, WIN_ALPHA, WIN_ALPHA_DIM, WIN_TINT, WIN_TINT_DIM, WIN_ACRYLIC, CUR_THEME
+    CUR_THEME = name
     t = THEMES[name]
     BG, BG_HEADER, BG_ROW, BG_ROW_HI = t["bg"], t["header"], t["row"], t["row_hi"]
     BG_INPUT, FG, FG_DIM = t["input"], t["fg"], t["fg_dim"]
     ACCENT, OVERDUE, BORDER = t["accent"], t["overdue"], t["border"]
     PRIO_COLOR = PRIO_COLORS[name]
-    WIN_ALPHA, WIN_TINT, WIN_ACRYLIC = t["alpha"], t["tint"], t["acrylic"]
+    WIN_ALPHA, WIN_ALPHA_DIM = t["alpha"], t["alpha_dim"]
+    WIN_TINT, WIN_TINT_DIM = t["tint"], t["tint_dim"]
+    WIN_ACRYLIC = t["acrylic"]
 
 
 PRIOS = ["baja", "media", "alta"]
 PRIO_RANK  = {"alta": 0, "media": 1, "baja": 2}
+
+
+# --------------------------------------------------------------------------- #
+#  Iconos  —  Lucide (lucide.dev, licencia ISC). SVG rasterizados a PNG y
+#  embebidos en base64: variantes idle/hover para tema claro y oscuro.
+#  Tamaños: 22 px (x, minus, settings), 26 px (plus), 15 px (grip).
+# --------------------------------------------------------------------------- #
+
+_ICON_B64 = {
+    'dark_grip_hot': (
+        'iVBORw0KGgoAAAANSUhEUgAAAA8AAAAPCAYAAAA71pVKAAABLklEQVR4AaySMU7DMBSGY6dKIoJeEzgASGyIEyAGuAF0hImFQ7Ew'
+        'wUg5AWLqCRAbgguUOC5BqdXEvJ8McTFSBxr5+ff3/P+JI1kG/3jWG9babmtdPWitD3Eo1iPmcVnaLbBb3pejaJ6x4dhaucsasO6w'
+        'nsTxPGddGnKJGJIkeSVKs+Fw844xYL0Fow92ywu7m6vWXthaOygKfaaU+jkmFIz+75d54aqqDsIwvJcyuuzMgysw9/c77mcvnKbp'
+        'c9M0o7Y1N51tcQ3m/kvH/eyFhRCLPKdxlmUFbFAw+mC3vDA2+f/+7GPPLc9U1/XebPb1UZafFzCynvMlUeiD3fLCxhjFhkch5Btr'
+        'IET7zvpkTIw+L/vhhYloypdiRLQxgY15QpSeEokp2C0v7G6uWn8DAAD///vilOEAAAAGSURBVAMA5mZzH4A25dgAAAAASUVORK5C'
+        'YII='
+    ),
+    'dark_grip_idle': (
+        'iVBORw0KGgoAAAANSUhEUgAAAA8AAAAPCAYAAAA71pVKAAABQklEQVR4AaySv07CYBTF29pERtRJHDSxLMYnMA72DZSJCNo42EbC'
+        'Q/QpMP0kMVUwxkF8AuvkExgXIDrphDJi6B/vwcEbrwmDNj293+/ec9oO19D+cP1vOAzDBXXSulHqfAM/FQRnm3TuNJtX82Au8eXR'
+        'aDZPhq0sy1aoarquL9PDTpJ0Dswlwp5X7ruH1bzn7V/A6Lp77S8u98FcIsyH084iHEWReaxaO41Ge/KbqGD0f75MhLvdl/UZXbs2'
+        'zfQAZsNMXXCv97oG5hLhYrHwkGRaKY6NUxjT2FBgy1p8BHOJsG3b8ZFb7dRqlXcYUcHog7lEGEPf93/tY8YlTEFwuVpYst5oMSow'
+        '0pLs0tIM0QdzifB4/DEkwy3piUT7oT9TvcvlJn06ft8iXK87A1qKEi3HPWyoxNuO4wzAXCLMh9POnwAAAP//ziao0QAAAAZJREFU'
+        'AwDtzXAfqTeDmwAAAABJRU5ErkJggg=='
+    ),
+    'dark_minus_hot': (
+        'iVBORw0KGgoAAAANSUhEUgAAABYAAAAWCAYAAADEtGw7AAAAaklEQVR4AeySMQrAIBAEQ1o5LVPmAfn/U/KAlCn1sI/XLF4pSQph'
+        'xYMV2UEG1+WnRTDEUgVVwACC+xWqeuRcr1LqPTLWsS6oLThwO3+2HVhEzpTCHmPYRsY61u1f5cD9xdtMMAxSxcQqHgAAAP//QNmh'
+        'CQAAAAZJREFUAwDedEAtlrd2OAAAAABJRU5ErkJggg=='
+    ),
+    'dark_minus_idle': (
+        'iVBORw0KGgoAAAANSUhEUgAAABYAAAAWCAYAAADEtGw7AAAAaUlEQVR4AeySsQnAIBBFQ5ZI6QDZKKTNDXVpQzbKAJbZwrP5eKWo'
+        'hfDFD1/kHvJwXQYtgiGWKqgCBlDcr1B9d72faPkrE/MsqFYc2M7dtgOLHJ9cZ7BslQl5tnyVA5cXrZ1gGKSKiVUkAAAA//+4d5bV'
+        'AAAABklEQVQDAMH7QC10pG1MAAAAAElFTkSuQmCC'
+    ),
+    'dark_plus': (
+        'iVBORw0KGgoAAAANSUhEUgAAABoAAAAaCAYAAACpSkzOAAABgElEQVR4AeRWsUoDQRScW2IRONDaH0jhr1wE2yBYWKTS1vxBYqvV'
+        'IRaCpBVMPkWL/IC1wkGKhFtnEjyyIZvc6oUIOd4ct7PvzdzbXbgzWLhOH+1x8mC7xBsxIWwgVKParrQWpFEYJalt5TlGnOwQJ0SN'
+        'CA3VqLYjLWn+CMyMRFiDZ5IxUVXE0pS2BM2sRYM0Ahio9KJgxDVL5WHY4hWAKjuhnBOxPLR0TYfezqApo0aIdv0AEEJqmNuQUY0P'
+        'peM2AYTSBfPEmozmjyXvh3VAKJlepAUbFZWBD3tkpJN1dwY8tVwccY+EZV65qvGt6O6XbjwBrl+Ai76LzzEgLPPKVc3/7cj3Zr/l'
+        'd79Hvjf/4h4Jvnkfr46mvslV/M0QEFbNreGmMtLne02OO6WTJbjsxtFIRoONaX9PGBhjcE+djNhWZPIwr5fRB3K0LcCo1ouCVtry'
+        '0NJh2I76UY5z2lTZWSZNaVOX/yi6EyLYoj7rPQ7fiaDTyHyFalTbk5Y0RQrfAAAA///6Xld7AAAABklEQVQDAP/koQkITCDvAAAA'
+        'AElFTkSuQmCC'
+    ),
+    'dark_settings_hot': (
+        'iVBORw0KGgoAAAANSUhEUgAAABYAAAAWCAYAAADEtGw7AAADtklEQVR4AYxTWWgUWRS9t6qm6aWqutNCGIagCDODM8yMzLcgYWYY'
+        'BgYRd9xwRQU/RDSiuICiokYFwYAi7vsSxQ9BBIOovyKCoP64EYOE2FZXVXeapPs9z63udFDsxOKevufd5VS9924b9I2P1toArG8s'
+        'p1GFe3t7bd8vHPf9Yr6KwrGenp7kaC8YVTgeT3VAZCkz9QHvwZfbdvoQ/Ig2ojC2HkP3bK3preMkfwJ+wfo11vNkJ+AN7TPhIAh+'
+        'DYL+zdhyW7FYnAS+C51xfGkXM5eBAazvM1MyHrelbpLU+n7/plwu/AO5utWFP34MpuN+nmitdhLpfeWyfgi/HvDLZXVgqAO8HdxD'
+        'fCMgNfuI1G7L4seigVxkkbDW2jJNQ86tDL4QmRXMfIGID1YqgxOzWecp1R7hg4P8OxHvlxpmWmUYxmIiKkOjA/0WeHUqcAQZLFqA'
+        'e+m0fc51U8dwnvNdN7kuk8m8CYLizHw+PCkQns0m3iHXJjWOkzpq24nT6O0Cvg/DMAtfFXYcB1ujblzKZDT/JwkB3s5hWLgIf5WZ'
+        'FwuE12IsNQLPC/+VXvBu27b74KvCaMARqDZmwhRwp+/7P0syDPtnaM1ziPRzZuNvgXCJSU5q8vn8j4bBNxm9lYpaw8xK4ob8CNJp'
+        '5xIz7QAw/NYUiSml/hfPbK52nESXQLjEhnPfTcNaJmdHU5NzHTyyunC0Gv5pFB+uqDGtqSwULzLFD6EuIKOCom1IlJQa6IQn3PYt'
+        '8VpXOoKg/y+BcIkN5ZTiG1iXmI2tnhfMBo8sEsaFROMG4QGl9FRMwkvJ4rY7mfVlIp6gtborEC4xyRGepqYE/ol6GnpLeNkBjdFF'
+        'mCLhsDoiLYZBDzMZ+44kBAwF207NhZ+FhlMC4bWYlhpBOm3fZqb74C210aVIuDYiMm6tGLcFQVBYGQTF875fbPc8b5zjJK+heYlA'
+        'uOeVxiG3V2pQuxoTIn+qVgh3Y3Rz8FVhZlZ41iJggJ/Fto7g6+ZhtNabZuxRLhf8hlxkfX3+BNOsPEFug9Sg9jB6zyAZ++q4ZTLO'
+        'Nej/iUvYQsQbiIzJ8AeJKGtZRht8ZLGYCc4uEe+p1WyUHvRObDhu2MZTzOou/F3bXTfx4MOHxGZ8UQi0vnql4/hCi5n+IaISctul'
+        'BrV7pUd6Ea9bdMb11Rdk/HjGGNEViI0dM6b4DGf6Ai8Zi7ILkoNvaCMKS1epVFgDfwKCzfA/AGdqMdDGNqpwc3Nz6LqpZa6bTGMi'
+        'HNdNLZJYY8lq5hMAAAD//51bUBAAAAAGSURBVAMAYcvZPjmZ4VQAAAAASUVORK5CYII='
+    ),
+    'dark_settings_idle': (
+        'iVBORw0KGgoAAAANSUhEUgAAABYAAAAWCAYAAADEtGw7AAAD+ElEQVR4AaRUW2hcZRD+5pzdJZR6oQ/WXKygsVRRi89CCSoiiIi3'
+        'FJPd2Njdk03zUMSmVKI2ESu2sYWCMbt7VrfJbqKNjeKDIIJBtK8ihYIXaqmySSwUaaUP6V7+32/O7gZbmqTQwz9n5p/L98+Zmf84'
+        'uMFneHjYIYVu0B1rAo+NzazPZAsft7S2X2ppvfeS70/56XR63VoHrAkcjlwZg8Wr1uKChfxtYeOOs/7oTQHv3z8TAaQTwF+LC2fu'
+        'WyhG7ucB5yxMl34J9SuuqzJOpQoPpP3CkO/nB7PZwqOtd5UPMLIJgjnWtzIy0lkSkR8AWReJlIbUR31Zqjc+8icexv+eZeBUavJ5'
+        'cXBKgHf5yYeMxUlYu4cZ/luFOdyIqVaqo5QvWmCf+ljIIZbqvRDcnxWDtmAFwMwm5LjOURFUDBBjSz0eMA2RI6Za3tof7zkdePPV'
+        '399zmraHIPYD8mkrTtIR7ABQEVfGFIsyIfhubt58O1mbBb5PJqIFb2fUTySi3V68+/X+/t4/fb/wYiZTyCmpTNu8F48Nknf3xbvS'
+        '8Xh0grFzArlz48Z7NhCrBry4+PtFbooCuy2Vyj9FubGENf+UQZ9DsyKprDo6CClY6fSxJzWWm+L582cvkNeAmX4F1gxaKxHHxWwm'
+        'M7FZjczuBUZvZw1/FTiPK9VkbFcb+GSz+XZxQl9prKma3cRiNVEDph2e1/OZI/IO2HER9xnwsRZPk0HEGUgkuuaUVFZdw0b+HPdN'
+        'GptM9nxBOVhB8wKJr+AocsBepQ9UK7yMOBU1GWNc5Q1aBkhx3GDt2zQslcvOLDk4JV8rt9aM+f70Y0oqq65hM+XSl9wviSNvZTJ5'
+        'vUzc1kvButTHzZasqTy7a1f3WbWy67Ns1nEItvC2fadUk3FcberDqTlnqpblsEsQOaxYqg8yro9IG6yc7Ovb8a0a6mT7EtGXBXgJ'
+        'FseUVFYdWC9SsJLJ2DcWwhuJtvro1ppXH5EiBB281tF0drqPXZ/KZPOj4+O5u5ndCc+L9iqprDrO9EH1IQ1ks1MxHtjBU4oc3X/I'
+        'a8BM35gqXmOHHcdFXqxJWaALVva4ofBP4+OTD6qzUjqd2+K44VNMYq/6kD401k7SFjHXG7dkMnqChkfo+KbA7iVtg8gRBmxwQ+4g'
+        'ebBEwoNs3K3M8P3Ax8o+jalWzNYVx03/A6zfgUQiNkr6MeyWhoh2GTAduVyuiV8WguAJ6pZCofKI+nhe90GN0Vjql1fQvOXdNUJv'
+        'by87jRlANpXK4V+aW9t/A7CJ4NOBjZuV1qrAGlS+EtlNoE9E7B38/BbATgY6Na5CawIPDHRe9uLRnQvzf9y2MH/mFi8Re0V1q2AG'
+        'pv8AAAD//xfyB40AAAAGSURBVAMAtzjCRJTCmSAAAAAASUVORK5CYII='
+    ),
+    'dark_x_hot': (
+        'iVBORw0KGgoAAAANSUhEUgAAABYAAAAWCAYAAADEtGw7AAABO0lEQVR4AezTv04CQRAG8G80BEUsfB6trLQwhMLCxAIbCh6IggoL'
+        'bSyMIcbGUp9IvOipjDujHH9mZ7mQUJBAbo+9229/t7e3u4UV/TZwMbFmKrhzXufO1QW3WjtFyqmksgbGdv0MxLfYwyO32zXHhKCg'
+        '2pNm96k5n7PwZ+UhhJ9D8BiVfBDDCxR0BPALfoaDkJ85DEy9XoZR1vRwg3J2St274YwaLgwc7kGDEbwsKkYUloYYDpnT8es7I5W+'
+        'UlxYGg1eEpW+SVgCWph29V9PlOP7YKTVxCkJT+YUh8F49T5oaDOHC0/Q/yXF7yep1TIvR2GL/i0pM+fOOpeHGNhDJSylLG5g3dIL'
+        'vr7Bq18Neeh0sfAb34P5EgvWqeJ5taHZUlu63/+g7vWNdpweQqQu29/L2hFHgGVurR/8CwAA//+mRbdHAAAABklEQVQDAHzO1C2s'
+        'MZNuAAAAAElFTkSuQmCC'
+    ),
+    'dark_x_idle': (
+        'iVBORw0KGgoAAAANSUhEUgAAABYAAAAWCAYAAADEtGw7AAABR0lEQVR4AezTP0vEMBgG8DclrXroJ9LJSQc5XATRpQh2uM9zQ7mh'
+        'kze4iBzi4qifx8E/aFNS80BajrxJrg43HFy4lyvNk1/TNEloTW0L9wvLlmI6vd+fzeaXVVXt9qnARSzL4CxrzlrSc9XIp7IsRwGT'
+        'gKapeka2aXbO3RyDtf54NKEXInEsktHCh3coifaIWvFa13JBTmNwURTfqs4wAy/uokqlp5PJxafjEoMRQNCHD0VheGF0+HCsaff6'
+        'oZliLCoIo9PFh6IYG4URsLVn/4mErqV817SiReF+TYkOjfNmyvtBzX32C8I9areU+ZgnpoK7xZW9MEPtlnLXPLTP8RAGh1CEUUNx'
+        'BuNIU/f6dqYAl8vFk+RgvNyPawZL+ftAibhetU+Bt/prjGw95Ejnef5ze3N1h4F4cqxw/ENZNuMY9J++zYP/AAAA//9LtcHoAAAA'
+        'BklEQVQDADVo2i0JW4iFAAAAAElFTkSuQmCC'
+    ),
+    'light_grip_hot': (
+        'iVBORw0KGgoAAAANSUhEUgAAAA8AAAAPCAYAAAA71pVKAAABJUlEQVR4AaxSMU4DMRDctfKAAF3ufBeJDvECRAE/gJRQ0fAoGioo'
+        'CS9AVLwA0SFy53M6IA+IbGYQinxyUAqwPJqd3Z07e2Ujf1j/ay6KYsfa6n40qg94qKqqDq2tp2VZblOnyP5sjBmK6JExMhasELQG'
+        'HavqFri3TU9BOOdenWuGXdfcQgr4hpp56hSZOS1uiteZB2VZn+Ku38ckU+NDA6C3M3NRjPdV5S5GvWBnCHKp0BjYHnWKzOz97DlG'
+        'majGazZicFcRuuu6F+oUmRnFJYY0bdv2E7GQqREvgd5eZ2bDb3nWVsiarLW7eBQfGNI5u8Bn0AvmqVNk5hDCAg0PGNQbWMAzkfj4'
+        'k2dqhczsvX/Ho5jM580Tu8jOtSfMU6fIzGlxU/wFAAD//8idNP8AAAAGSURBVAMADaVqH4mhouAAAAAASUVORK5CYII='
+    ),
+    'light_grip_idle': (
+        'iVBORw0KGgoAAAANSUhEUgAAAA8AAAAPCAYAAAA71pVKAAABRklEQVR4AaySsUrDUBSGb5KSrok+gEI38QnEQd9AO+rkInRoyR2K'
+        'SemQoZpIh5SUUnBx0tH6BOLUJxC3oi9Qk44NSfT8Ll48Qgcb8nPOd87/J3e4uvjHs96w53mbUnYeW62LPRyK6r7jeBMp/Q2wKvbn'
+        'PDcsMhwYhrFNVei6tqVp2mGe5zZYFQv3+71ZFF1ZpHsYB4PwjnprOOzNwKpYWF2u6lnY9/2KlO5xo+F+HxMVjPnvj7Fwmma7QugP'
+        '1ap2BrNpinNwkmQ7YFUsbFnmixBlfbn8vIUxy8QN2LbNV7AqFqbj5VEUTsbjMIERFYw5WBULY0nGP+fYqWKmZrNbWyyyD8dxT2GU'
+        'snNCStvtbg2sioXLskjJ8FSWxhtVURTFO9XnSqXAnNqfl4VHo2BOl6Iex5dT2OL4ekp8FATBHKyKhdXlqv4LAAD//3OFf2UAAAAG'
+        'SURBVAMA8BpyH7G0Te4AAAAASUVORK5CYII='
+    ),
+    'light_minus_hot': (
+        'iVBORw0KGgoAAAANSUhEUgAAABYAAAAWCAYAAADEtGw7AAAAY0lEQVR4AeySQQrAIAwESz/RiyQP6P+f0gckeOkvGi+LOUr1IKy4'
+        'sCIZZPA8Fi2CIZYqqAIGUNKvEJG7FLXIOxhrs6BGSeA4T9sJ7O5PraaRazDaZvtXJXB/8bcTDINUsbGKDwAA//9UwuYLAAAABklE'
+        'QVQDAP2EQC2R9AU4AAAAAElFTkSuQmCC'
+    ),
+    'light_minus_idle': (
+        'iVBORw0KGgoAAAANSUhEUgAAABYAAAAWCAYAAADEtGw7AAAAbElEQVR4AeySwQnAIAxFS5fosQO4nDmJE4inuJwD9NgtKggfc5S2'
+        'B+GLgS+SR3hk3346BEMsVVAFDCCYrRAJzvt4icR7pnpPcKC2YMDt/dk1YNVcS0mnajpmqvfkOk5lwOPH20wwDFLFwioeAAAA///3'
+        'YcdEAAAABklEQVQDAED8QC0kDqqXAAAAAElFTkSuQmCC'
+    ),
+    'light_plus': (
+        'iVBORw0KGgoAAAANSUhEUgAAABoAAAAaCAYAAACpSkzOAAABj0lEQVR4AeSVvUoDQRSFzwwqGrTUwlpIkSfwBex8ARErwUpbBduI'
+        '2molWIn4Aul8AV8gKQLWFloqQUxwvF8gYbPJLjtmIYJhzmbm3nPPmb9lvRK/ymVYX6qH80o9NA1dQ4gENc2+hmklpDU0WjwLO6Gr'
+        'tpNOjFAzzBliGzU1NNBCcyDQNyLgg+6NsDxITPuPFppoo+XZLhd0YwPL2bPc5tDGw9sSD82htJWk54k2Ht462+lk2WM8OKNqjPDK'
+        'ggRiaoxbxYibYv1i7XFPAsXYQ9YcRsNRkc5qRQJFuElOtFGyOKb/j4y4WU/70vORRrBmbxxIx+FSk7Wds9+69y9p81bauBrF64cE'
+        '0nG41PzdFWXN7Lfx2Z9R1szfOhLIymfFWVEvKzkpvnUngUm5nFgPo3YOYSzFzQJjifxA2762auRzps8GqeHdvK6tY2/H9IKTFNDG'
+        'w3eO3UtwOjCSxexZbgto48EZ6fPUPXw77ZpTaStDC020mXvfiA4BW2LVCBc2bhmibqPxadS00EALTYLgBwAA//90EXCiAAAABklE'
+        'QVQDAKuzohUa/I+jAAAAAElFTkSuQmCC'
+    ),
+    'light_settings_hot': (
+        'iVBORw0KGgoAAAANSUhEUgAAABYAAAAWCAYAAADEtGw7AAADrUlEQVR4AYxUbYhUZRR+zr2z67q1FcHmMvdjBvrAlkr6HSxLRQQR'
+        '0ZeRJtkHFfgjIjeMtSDJyLYEIaGQPvxavxV/CCIoov4VEWTVH8rM3DvLyor4zaDjPT7n3p1R0Rm9nGff555z3mffc95zx8GDP5ab'
+        'e9B0S26b29vb+3AQFP4JgvBCEBQu+H5hVT6f7267icH7Cnd1TV/JvE8BOQtgQgSfO07HCvK21la4v7+/E5DZqqhEUfnpnp6HngVQ'
+        'ovgcqwRtnjuEwzDsZ7nDLHeI/KVLl64s5d4uEd3HtT42NnYN0APk3dOmTR+2nCy3+L3v+y/Q37SmMBPeSRIcZeRnnug3VTlEvpC4'
+        'SLE/uE6ZjpCcF5FFliMC5uovIu4R02AstYZwjqdaISJ1VZ1HfMHoKLH8+nWZFUXRMfLUjCdJ/Xm+/E6Mct9XxHzyugjsPtLJSYV5'
+        'y48B4gPYH8eVdcQq9nQu8e3ERKnseeF7QRD+ZzBe5cPYEDG3Uqn8TazmXmtX34wZTz5OjlR4fHz8PMuN6Rjw/eLrXBsmFNvgOLIF'
+        'kPkG4+YDIJh6giB4jXTANM6cOWXTkwnTWQecIbagk2Vt8zzvGfrA070LyAeqOMH+v2Iwbr4sBvDSnuLenbZXVb4GkBBNYURRaaOI'
+        'LKGz23Fyb3KF4+ANW1WxoFot7zMYN18jBrhv852TI0viuLydPLW0FSm77Q8339N/W0qT8jCsFuCJ3aaTpClgo8Lgj/TVHEe3cQVL'
+        '32WrCFZ6XuFlg3HzNWKuix18r4nID54XziZPrSHcGDd+AMlbvOXTFq1WK/wHukkEM1n6XoNxnm9TFuNnWCqVVMXawQPB5v3WuGUj'
+        'YuOmhzine0x0ChpFlQ+TRN+n2P8G4+ZjXInU4ri0m4RfpPjZ6ALpibMRUY6bDPp++BE/1S+DoLCeGOnrKxZ4uq0U+8RgvFgsFny/'
+        'uIxxy1nAFsyj8CD/cczRPUeeCZMk7Nk37LEjImtZ2l/0zSEWdnToYc7pc+Sp5fPFmTdu6FGO5Xd0WM6fjiNryDu57+5xs5Mw+UUm'
+        'LFYFNyUceCznO78kGeKamuuq8Ud4iF+BZIB7FjGwmHxW3GrcIv4mRFF5KRNGyA+6rgwDellVBll+FwVyqniVay2Xc36yHF70MttD'
+        '3vw9YbzZCuN3gRdeA2SzCEKWf5w9PWkcwGgWI2th6eW1iKXuWu2q9e1fvjxB5FnBmikfX1vbfYUnJycvs9TPiEeJniiqfGy+1pJZ'
+        '5CYAAAD//zvjgf8AAAAGSURBVAMASh2kRO3vH3AAAAAASUVORK5CYII='
+    ),
+    'light_settings_idle': (
+        'iVBORw0KGgoAAAANSUhEUgAAABYAAAAWCAYAAADEtGw7AAADzklEQVR4AaRVXWhbZRh+3pimo6RNtwsRGfNGRUUdXgtjqIggIpub'
+        '4nRYf6iyv5zEVZqTaU/GmnSrS043O5Sh1qn1Z63ihSCCRXS3IgNBvZEpFbwYXWtyEeNZ3j3vOVnYbzrYx/ud73n/nvO+33nTxnCN'
+        'y/O8GHf8GsOxLPG2bSPJbNZ9d2mpsbS42FgiPjo46PUs94JliROJ/ydV8QKgp0XwD/FLyWRj4rqIR0ZGEiR7kqR/pVLdt/X1dd1J'
+        'fKrZxBbrpBP5RRXv3Jm7y3HcfCbjDjlO7v5qNRhl8goRmeP9BoVCoaEqP4igp7s7yFtMFOvm0mn3Xsa2pU3MoI3xuJwUwT56D4jI'
+        'CVXdTfxvEOAgz1BY7TjBIisfthhixqIYi+Fn46AeSkjMauLU7N4CJm4V0UHq0yQuqzbXHjpU/IV6KIaDILhHVd+kYZqxrwAyACAQ'
+        'wWSLCyFxtVrtF5HVrOL7iYniR+Vy6WilUnzG90uv+v7Yn6xkk+O470c7t+nw4QN/0zdkMYx9p1IZ/YC5c4DcVKvVVoErJO7t7bXW'
+        '5nl/6zKZ4UdoPy9C0k/40uMiGIi2HDcbAEFrMedhy2UX88lk8rSZQ2KWHwAyxMSEamw2m83dDi4SPCEiTxH+RvuDtg2bzXzEIOmt'
+        'QOwrESSop8nV5BldhQG29akq9jKgR1UeMxsgj4KLhNt9f9+cbcM0USIfSTdQ4eRgL6/nC+JQYuGz9eCXbSFcZD9vvMrJbgF+9Bsu'
+        '9LcJ2NpGVbxBZ51hszwp+jUfEGlOOs6eB2wbNhsQ+VSbX1Kvs9PXOdP8MVGjhMSe54XjRuIG0Hy8Uhn7gz6wtVlV/Yz4DhJ+Z9uw'
+        '2cxHzJixU8zZwNw67QdbXFHLNiLCcRPREyT91hJaW0nwNBM2M3Eq2rrZbPQrdyjM+Ya5/EXKahtdM4YVRyOi84CsT6fdZzkVL7Ot'
+        'j3k9444zfAuJZny/+Hy0SzNmy2bz+6MYd7vj5LdaLqDzHN0FcIXELL/JajKm8wN+qCpvE29hF7tFYj/t2uXeTT2UHTtyvJbYSXbx'
+        'Gg2MwVus9hgxRxWXj5vvl2bOnsV9qtjDICbpOiaUiVfxZUM8Q0kkxHAfIGOskDEYthzmriXHlcfN/g74fnGUMz1eqZR+XFjozgOo'
+        'kWD9wIC3gp3FWelDtNXPnOkqWEy5XNxvOZZLe1vCq2hrl4CpKY9fGp/zStasXPnfr/wv8jsga0QwbT50WB2JLa/R6EqT6D1VuZH6'
+        'zao4Vq93pYk7yrLER44Uamz3xf7+RCqVSvSy7efM1pEVwDkAAAD//6Qp1UwAAAAGSURBVAMAfLjNRFMj92gAAAAASUVORK5CYII='
+    ),
+    'light_x_hot': (
+        'iVBORw0KGgoAAAANSUhEUgAAABYAAAAWCAYAAADEtGw7AAABQUlEQVR4AezTvy8EQRjG8e8QcriSRkWnUOqoVBRyUUr8e7QiF7lG'
+        'SaeUKKk0lEcul6z1PtZszvzYW4VCcpN7s5ubZz6ZmZ2Z44/aDK43NtqKe9a6D6yePLLRqVOZl6ZsBM9THoE7HzG8umN9mUwTaoMH'
+        'VNljgmZ9P/95Y/ESymtw+yuM+yncow72SrgpcH2CFsE7PL9b0GaQxkP0Aw63eRkGLhGsgIIpvC0qIwmrI4VbeOCXn5upxqosq0e6'
+        'QrwtKq0RVqAqt1Q9wVGORyzYhGlsjbDfUxN2rW6nnRbL1L8s7FG//AIOClz2tNTi90sSDlFb99eRCvc8d85lR3AOVVjVFo9gXWm/'
+        'fD9TgZOVwHuT/XqP4A7dC/vypzlUg1TC7fr3lLW9n36lN3kabfF6poECmkrXP5eNZtwE/abv/8GfAAAA//+3gUMCAAAABklEQVQD'
+        'AJH5qy0Bp5ynAAAAAElFTkSuQmCC'
+    ),
+    'light_x_idle': (
+        'iVBORw0KGgoAAAANSUhEUgAAABYAAAAWCAYAAADEtGw7AAABT0lEQVR4AezTMU8CMRgG4K8X7uJdJCHh5+jkpIMhjiYOTAysjA6e'
+        'gyMrAxOLrsYQ4+KoP4cJEXt3ucobUnK0/ZpjYCChycc16duHtncNaE/tCG8O1jqKfv/hdDC4v+1205NNiun4shYcx8V1WaqXVku+'
+        '93ppwpgENIryD2Tb7fzGzFnwfB6+EYlPIcRFksipC9eoEHSuFH0tl40pGc2Cx+P0V8rGagVu3ESzLLwajR5/DJcsGAEEXXhdFIYT'
+        'xoALx5nq7XMrxVwUC2PQxOuimOuFEVhXGa+f+FVZUYgSPV95YX2mROKMSH2vnt6vhSqNhTWqty9ldOl6oRVrq+uETVS/KPPMue8c'
+        '/2DBHIowqi5uwbjSevt6pQCrZeLNZt6pjqNvwbNZ+BoE4o5DMQkFfLEIO8jWutKTSfo3HD49YyIAX+H6c1lrxT5ol7HDg/8BAAD/'
+        '/68H3FMAAAAGSURBVAMAqIXlLb+V2DMAAAAASUVORK5CYII='
+    ),
+}
+
+
+_ICON_CACHE = {}
+
+
+def _get_icon(key):
+    img = _ICON_CACHE.get(key)
+    if img is None and key in _ICON_B64:
+        img = tk.PhotoImage(data=_ICON_B64[key])
+        _ICON_CACHE[key] = img
+    return img
+
+
+def make_icon(parent, name, *, bg, command=None):
+    """tk.Label con el PNG del icono para el tema actual; alterna en hover."""
+    if name == "plus":
+        idle = hot = _get_icon(CUR_THEME + "_plus")
+    else:
+        idle = _get_icon(f"{CUR_THEME}_{name}_idle")
+        hot = _get_icon(f"{CUR_THEME}_{name}_hot")
+    lbl = tk.Label(parent, image=idle, bg=bg, bd=0, highlightthickness=0,
+                   cursor="hand2", takefocus=0)
+    lbl._imgs = (idle, hot)                     # referencias vivas (evita el GC de Tk)
+    if hot is not None and hot is not idle:
+        lbl.bind("<Enter>", lambda e: lbl.configure(image=hot))
+        lbl.bind("<Leave>", lambda e: lbl.configure(image=idle))
+    if command:
+        lbl.bind("<Button-1>", command)
+    return lbl
+
 
 MESES = ["ene", "feb", "mar", "abr", "may", "jun",
          "jul", "ago", "sep", "oct", "nov", "dic"]
@@ -380,6 +594,7 @@ class TaskWidget:
         self._editing = False
         self._summon_flag = False
         self._glass_on = False
+        self._dragging = False
 
         self.win.setdefault("theme", "auto")
         apply_theme(resolve_theme(self.win["theme"]))
@@ -412,7 +627,8 @@ class TaskWidget:
 
         self.render()
 
-        self.root.bind("<FocusOut>", lambda e: self.root.after(250, self._maybe_lower))
+        self.root.bind("<FocusOut>", lambda e: self.root.after(200, self._on_focus_evt))
+        self.root.bind("<FocusIn>", lambda e: self.root.after(1, self._on_focus_evt))
         self.root.after(350, self._pin_to_desktop)
         self.root.after(500, self._snap_onscreen)   # recupera la ventana si quedó fuera de pantalla
         self.root.after(30000, self._autosave)
@@ -432,26 +648,15 @@ class TaskWidget:
         title = tk.Label(h, text="  Tareas", bg=BG_HEADER, fg=FG, font=self.f_title)
         title.pack(side="left")
 
-        btn_close = tk.Label(h, text="✕  ", bg=BG_HEADER, fg=FG_DIM, font=self.f_title,
-                             cursor="hand2")
-        btn_close.pack(side="right")
-        btn_close.bind("<Button-1>", lambda e: self.quit())
-        btn_close.bind("<Enter>", lambda e: btn_close.config(fg=OVERDUE))
-        btn_close.bind("<Leave>", lambda e: btn_close.config(fg=FG_DIM))
+        btn_close = make_icon(h, "x", bg=BG_HEADER, command=lambda e: self.quit())
+        btn_close.pack(side="right", padx=(2, 6))
 
-        btn_col = tk.Label(h, text="–", bg=BG_HEADER, fg=FG_DIM, font=self.f_title,
-                           cursor="hand2")
-        btn_col.pack(side="right", padx=4)
-        btn_col.bind("<Button-1>", lambda e: self.toggle_collapse())
-        self._tooltip(btn_col, "Colapsar / expandir  ·  atajo global: Ctrl+Alt+T")
+        btn_col = make_icon(h, "minus", bg=BG_HEADER,
+                            command=lambda e: self.toggle_collapse())
+        btn_col.pack(side="right", padx=2)
 
-        btn_cfg = tk.Label(h, text="⚙", bg=BG_HEADER, fg=FG_DIM, font=self.f_title,
-                           cursor="hand2")
+        btn_cfg = make_icon(h, "settings", bg=BG_HEADER, command=self._header_menu)
         btn_cfg.pack(side="right", padx=2)
-        btn_cfg.bind("<Button-1>", self._header_menu)
-        btn_cfg.bind("<Enter>", lambda e: btn_cfg.config(fg=FG))
-        btn_cfg.bind("<Leave>", lambda e: btn_cfg.config(fg=FG_DIM))
-        self._tooltip(btn_cfg, "Opciones (también con clic derecho en la barra)")
 
         # contador discreto por prioridad (tareas pendientes)
         cnt = tk.Frame(h, bg=BG_HEADER)
@@ -525,11 +730,8 @@ class TaskWidget:
         self.prio_dot.bind("<Button-1>", self._cycle_new_prio)
         self._tooltip(self.prio_dot, "Prioridad de la nueva tarea (clic para cambiar)")
 
-        btn_add = tk.Label(add, text="+", bg=ACCENT, fg="#ffffff", width=2,
-                           font=self.f_title, cursor="hand2")
-        btn_add.pack(side="right", padx=(4, 6), pady=6, ipady=1)
-        btn_add.bind("<Button-1>", lambda e: self.add_task())
-        self._tooltip(btn_add, "Agregar tarea (Enter)")
+        btn_add = make_icon(add, "plus", bg=BG_HEADER, command=lambda e: self.add_task())
+        btn_add.pack(side="right", padx=(4, 6), pady=6)
 
         self.e_due = tk.Entry(add, bg=BG_INPUT, fg=FG_DIM, insertbackground=FG,
                               relief="flat", font=self.f_small, width=7, justify="center")
@@ -547,7 +749,8 @@ class TaskWidget:
         f = tk.Frame(self.root, bg=BG_HEADER, height=13)
         f.pack_propagate(False)
         self.footer = f
-        grip = tk.Label(f, text="◢", bg=BG_HEADER, fg=FG_DIM, font=self.f_small, cursor="sizing")
+        grip = make_icon(f, "grip", bg=BG_HEADER)
+        grip.configure(cursor="sizing")
         grip.pack(side="right", padx=3)
         grip.bind("<Button-1>", self._resize_start)
         grip.bind("<B1-Motion>", self._resize_move)
@@ -752,6 +955,7 @@ class TaskWidget:
                            f"+{self.win['x']}+{self.win['y']}")
         try:
             self.root.attributes("-topmost", True)   # la barrita nunca se pierde
+            self.root.attributes("-alpha", WIN_ALPHA)
         except tk.TclError:
             pass
         if save:
@@ -767,6 +971,7 @@ class TaskWidget:
         except tk.TclError:
             pass
         self.render()
+        self._on_focus_evt()
         self._send_to_bottom()
         if save:
             self.save()
@@ -785,31 +990,49 @@ class TaskWidget:
             print("No se pudo fijar al escritorio:", exc)
 
     # ------------------------------------------------------------------ estética / tema
+    def _has_focus(self):
+        try:
+            return self.root.focus_displayof() is not None
+        except (KeyError, tk.TclError):
+            return False
+
     def _apply_glass(self):
         """Translucidez + acrylic blur + marco acorde al tema."""
-        try:
-            self.root.attributes("-alpha", WIN_ALPHA)
-        except tk.TclError:
-            pass
         dark = resolve_theme(self.win.get("theme", "auto")) == "dark"
         win_dwm_flags(self._hwnd, dark)
-        if WIN_ACRYLIC:
-            win_acrylic(self._hwnd, WIN_TINT, enabled=True)
+        self._on_focus_evt()
+
+    def _on_focus_evt(self):
+        """Ajusta translucidez y tinte según si la ventana tiene foco o no.
+        Sin foco → más translúcida y (en oscuro) más oscura."""
+        if self.win["collapsed"]:
+            return
+        focused = self._has_focus()
+        alpha = WIN_ALPHA if focused else WIN_ALPHA_DIM
+        tint = WIN_TINT if focused else WIN_TINT_DIM
+        try:
+            self.root.attributes("-alpha", alpha)
+        except tk.TclError:
+            pass
+        if WIN_ACRYLIC and IS_WIN and self._hwnd and not self._dragging:
+            win_acrylic(self._hwnd, tint, enabled=True)
             self._glass_on = True
-        else:
-            win_acrylic(self._hwnd, WIN_TINT, enabled=False)
+        elif not WIN_ACRYLIC and IS_WIN and self._hwnd:
+            win_acrylic(self._hwnd, 0, enabled=False)
             self._glass_on = False
+        if not focused:
+            self._maybe_lower()
 
     def _glass_suppress(self):
         """Apaga el blur mientras se arrastra/redimensiona (evita tirones en Win10)."""
+        self._dragging = True
         if self._glass_on and IS_WIN and self._hwnd:
             win_acrylic(self._hwnd, WIN_TINT, enabled=False)
             self._glass_on = False
 
     def _glass_resume(self):
-        if WIN_ACRYLIC and not self._glass_on and IS_WIN and self._hwnd:
-            win_acrylic(self._hwnd, WIN_TINT, enabled=True)
-            self._glass_on = True
+        self._dragging = False
+        self._on_focus_evt()
 
     def _set_theme(self, choice):
         self.win["theme"] = choice
