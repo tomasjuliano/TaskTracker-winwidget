@@ -31,6 +31,7 @@ jobs:
           --onefile
           --windowed
           --name TaskWidget
+          --icon assets/icon.ico
           --collect-submodules tkinter
           task_widget.py
 

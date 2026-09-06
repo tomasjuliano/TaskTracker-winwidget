@@ -127,9 +127,17 @@ Compilar a mano localmente (si querés probar el `.exe` sin esperar a Actions):
 
 ```bash
 pip install pyinstaller
-pyinstaller --onefile --windowed --name TaskWidget task_widget.py
+pyinstaller --onefile --windowed --name TaskWidget --icon assets/icon.ico task_widget.py
 # queda en dist/TaskWidget.exe
 ```
+
+### Icono
+
+`assets/icon.ico` (multi-tamaño 16→256) sale de `assets/icon-light.svg`. Para
+regenerarlo hay que rasterizar el SVG a PNG y armar el `.ico` con Pillow
+(los tamaños chicos usan `assets/icon-light-small.svg`, sin las marcas del reloj).
+`assets/icon-dark.svg` es la variante para fondos claros / uso a futuro en un
+icono de bandeja.
 
 ---
 
