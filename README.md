@@ -7,7 +7,7 @@ Un tracker de tareas que vive en el escritorio de Windows. Python + tkinter,
 - **Vive pegado al escritorio**: aparece detrás de las ventanas normales. Al
   hacerle clic sube al frente; al hacer clic afuera vuelve a bajar.
 - Colapsado queda como una barrita siempre visible, así nunca se pierde.
-- Atajo global **`Ctrl+Alt+T`** para traerlo al frente desde cualquier lado.
+- Atajo global (**`Ctrl+Alt+T`** por defecto, configurable) para traerlo al frente.
 - Tareas con fecha de vencimiento y prioridad, contador por prioridad, ventana
   redimensionable.
 - **Tema claro / oscuro / automático**, con estética translúcida tipo *glass*
@@ -48,7 +48,7 @@ pythonw task_widget.py
 ```
 
 `pythonw` no deja una consola abierta. Usá `python task_widget.py` si querés ver
-mensajes de error o el aviso de "Ctrl+Alt+T ya está en uso".
+mensajes de error por consola (el aviso de "atajo en uso" también sale en la UI).
 
 ### Para que arranque con Windows
 
@@ -63,8 +63,8 @@ administrador y se puede desmarcar en cualquier momento.
 |---|---|
 | Mover la ventana | Arrastrar desde la barra "Tareas" |
 | Redimensionar | Arrastrar la franja fina de abajo |
-| Colapsar / expandir | Botón `–`, doble clic en el título, o `Ctrl+Alt+T` |
-| Traer al frente | `Ctrl+Alt+T` |
+| Colapsar / expandir | Botón `–`, doble clic en el título, o el atajo global |
+| Traer al frente | Atajo global (`Ctrl+Alt+T` por defecto; se cambia en Opciones) |
 | Minimizar a la bandeja | Botón `✕` (o "Salir" en el tray para cerrar de verdad) |
 | Agregar tarea | Escribir abajo → Enter (o el `+`) |
 | Prioridad de la nueva tarea | Clic en el `●` de la izquierda (baja → media → alta) |
@@ -78,7 +78,8 @@ administrador y se puede desmarcar en cualquier momento.
 | Elegir fecha con calendario | Iconito de calendario al lado de "venc." (o clic derecho en la tarea → "Fecha en calendario…") |
 | Borrar | Clic en la `✕` que aparece al pasar el mouse por la fila (`Ctrl+Z` / "Deshacer" para recuperar) |
 | Limpiar completadas | Enlace "Limpiar N completadas" al pie de la lista |
-| Opciones (tema, iniciar con Windows, opacidad) | Botón `⚙` o clic derecho en la barra de título |
+| Cambiar el atajo global | Opciones → "Atajo global" → "Cambiar…" y presionás la combinación |
+| Opciones (tema, atajo, iniciar con Windows, opacidad) | Botón `⚙` o clic derecho en la barra de título |
 | Mostrar / ocultar · salir | Icono de la bandeja del sistema (clic izq. muestra, clic der. abre el menú) |
 
 ### Estética "glass" — límites
@@ -183,6 +184,9 @@ icono de bandeja.
 - **Mini calendario para el vencimiento**: iconito de calendario al lado de "venc."
   y opción "Fecha en calendario…" en el menú de cada tarea. Dibujado con tkinter
   (sin dependencias): mes navegable, "Hoy" y "Borrar". (#14)
+- **Atajo global configurable**: en Opciones se captura la combinación y se guarda
+  en `tasks.json`. Si el atajo está ocupado por otro programa, ahora se avisa en
+  la propia UI (enlace al pie + estado en Opciones), no sólo por consola. (#16)
 
 **Arreglos**
 

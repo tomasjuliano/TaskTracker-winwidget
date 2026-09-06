@@ -51,10 +51,14 @@ if IS_WIN:
     GA_ROOT          = 2
     MOD_ALT      = 0x0001
     MOD_CONTROL  = 0x0002
+    MOD_SHIFT    = 0x0004
+    MOD_WIN      = 0x0008
     MOD_NOREPEAT = 0x4000
     WM_HOTKEY    = 0x0312
     WM_QUIT      = 0x0012
+    WM_APP_REHK  = 0x8004          # pedirle al hilo del atajo que re-registre
     VK_T         = 0x54
+    HOTKEY_ID    = 1
 
     # argtypes correctos: sin esto, en Windows de 64 bits los HWND se truncan
     # a 32 bits y las llamadas fallan en silencio (era el bug del atajo).
@@ -635,7 +639,8 @@ DEFAULT_STATE = {
     "window": {"x": None, "y": None, "w": 310, "h": 340, "collapsed": False,
                "sized": False, "theme": "auto", "dim_opacity": None,
                "close_to_tray": True, "tray_hint_shown": False,
-               "always_on_top": False, "due_alerts": True, "manual_order": False},
+               "always_on_top": False, "due_alerts": True, "manual_order": False,
+               "hotkey": "ctrl+alt+t"},
     "tasks": [],
 }
 
@@ -1099,6 +1104,70 @@ DIAS_MIN = ["L", "M", "M", "J", "V", "S", "D"]        # semana arranca lunes
 
 MIN_W, MIN_H = 250, 170
 
+# --- atajo global configurable (Windows) ------------------------------------
+_HK_MODS = {"ctrl": 0x0002, "control": 0x0002, "alt": 0x0001, "shift": 0x0004,
+            "win": 0x0008, "super": 0x0008, "meta": 0x0008}
+_HK_MOD_ORDER = [(0x0002, "Ctrl"), (0x0001, "Alt"), (0x0004, "Shift"), (0x0008, "Win")]
+_HK_SPECIAL = {"space": 0x20, "enter": 0x0D, "return": 0x0D, "tab": 0x09,
+               "home": 0x24, "end": 0x23, "insert": 0x2D, "delete": 0x2E,
+               "pageup": 0x21, "pagedown": 0x22}
+# keysyms de tkinter → nuestro nombre de tecla / de modificador
+_KS_MODS = {"Control_L": "ctrl", "Control_R": "ctrl", "Alt_L": "alt", "Alt_R": "alt",
+            "Shift_L": "shift", "Shift_R": "shift", "Super_L": "win", "Super_R": "win"}
+
+
+def _key_to_vk(key):
+    if not key:
+        return 0
+    key = key.lower()
+    if len(key) == 1 and "a" <= key <= "z":
+        return ord(key.upper())
+    if len(key) == 1 and "0" <= key <= "9":
+        return ord(key)
+    if key.startswith("f") and key[1:].isdigit() and 1 <= int(key[1:]) <= 24:
+        return 0x70 + int(key[1:]) - 1
+    return _HK_SPECIAL.get(key, 0)
+
+
+def hotkey_label(mods, vk):
+    names = [name for bit, name in _HK_MOD_ORDER if mods & bit]
+    if 0x41 <= vk <= 0x5A or 0x30 <= vk <= 0x39:
+        kn = chr(vk)
+    elif 0x70 <= vk <= 0x87:
+        kn = "F%d" % (vk - 0x70 + 1)
+    else:
+        kn = next((k.capitalize() for k, v in _HK_SPECIAL.items() if v == vk), "?")
+    return "+".join(names + [kn])
+
+
+def parse_hotkey(spec):
+    """'ctrl+alt+t' → (mods, vk, 'Ctrl+Alt+T'); None si falta modificador o tecla."""
+    parts = [p.strip().lower() for p in (spec or "").split("+") if p.strip()]
+    mods, key = 0, None
+    for p in parts:
+        if p in _HK_MODS:
+            mods |= _HK_MODS[p]
+        else:
+            key = p
+    vk = _key_to_vk(key)
+    if not vk or not mods:
+        return None
+    return mods, vk, hotkey_label(mods, vk)
+
+
+def keysym_to_name(ks):
+    """keysym de un <KeyPress> → nombre de tecla que entiende parse_hotkey."""
+    if len(ks) == 1 and ks.isalpha():
+        return ks.lower()
+    if len(ks) == 1 and ks.isdigit():
+        return ks
+    low = ks.lower()
+    if low.startswith("f") and low[1:].isdigit():
+        return low
+    return {"space": "space", "return": "enter", "tab": "tab", "home": "home",
+            "end": "end", "insert": "insert", "delete": "delete",
+            "prior": "pageup", "next": "pagedown"}.get(low)
+
 
 def parse_due(text):
     """Acepta 'YYYY-MM-DD', 'DD/MM', 'DD/MM/YYYY'. Devuelve ISO o ''."""
@@ -1164,6 +1233,12 @@ class TaskWidget:
         self._dragging = False
         self._hidden = False
         self._hk_tid = None
+        self._hk_ok = True           # ¿se pudo registrar el atajo global?
+        self._hk_label = "Ctrl+Alt+T"
+        self._hk_result = None       # resultado de un re-registro pedido
+        self._pending_hk = None
+        self._active_hk = None
+        self._cap = []               # modificadores capturados al elegir atajo
         self._undo = None            # (tarea, índice) del último borrado
         self._undo_after = None
         self.tray = None
@@ -1219,6 +1294,7 @@ class TaskWidget:
         if IS_WIN:
             threading.Thread(target=self._hotkey_loop, daemon=True).start()
             self.root.after(150, self._poll_summon)
+            self.root.after(900, self._hk_refresh)   # refleja si el atajo falló
             self._register_toast()
             self.tray = Tray()
             self.root.after(400, self._poll_tray)
@@ -1426,6 +1502,20 @@ class TaskWidget:
             chk("Avisar cuando una tarea vence", self._due_var,
                 self._toggle_due_alerts, (2, 0))
 
+            sub("Atajo global para traer el widget al frente")
+            hkrow = tk.Frame(t, bg=BG)
+            hkrow.pack(fill="x")
+            self._hk_status_lbl = tk.Label(
+                hkrow, anchor="w", bg=BG, font=self.f_small,
+                text=(f"Atajo global: {self._hk_label}" if self._hk_ok
+                      else f"⚠ {self._hk_label} en uso — cambialo"),
+                fg=(FG if self._hk_ok else OVERDUE))
+            self._hk_status_lbl.pack(side="left")
+            chg = tk.Label(hkrow, text="Cambiar…", bg=BG, fg=ACCENT,
+                           font=self.f_small, cursor="hand2")
+            chg.pack(side="right")
+            chg.bind("<Button-1>", lambda e, b=chg: self._capture_hotkey(b))
+
         sub("Opacidad cuando no está en foco")
         cur = int(round((self.win.get("dim_opacity") or WIN_ALPHA_DIM) * 100))
         track = "#4a4a47" if CUR_THEME == "dark" else "#c9c9d2"
@@ -1572,6 +1662,9 @@ class TaskWidget:
                                 self._clear_done)
         if manual and len(self.tasks) > 1:
             self._footer_action("Orden manual  ·  volver al automático", self._auto_sort)
+        if IS_WIN and not self._hk_ok:
+            self._footer_action(f"⚠ Atajo {self._hk_label} ocupado  ·  cambialo en Opciones",
+                                self._header_menu)
 
         counts = {"alta": 0, "media": 0, "baja": 0}
         pend = 0
@@ -2225,9 +2318,14 @@ class TaskWidget:
     # ------------------------------------------------------------------ atajo global (Win)
     def _hotkey_loop(self):
         self._hk_tid = ctypes.windll.kernel32.GetCurrentThreadId()
-        if not u32.RegisterHotKey(None, 1, MOD_CONTROL | MOD_ALT | MOD_NOREPEAT, VK_T):
-            print("Ctrl+Alt+T ya está en uso por otro programa; el atajo no estará disponible.")
-            return
+        spec = (parse_hotkey(self.win.get("hotkey", "ctrl+alt+t"))
+                or parse_hotkey("ctrl+alt+t"))
+        mods, vk, label = spec
+        self._active_hk = (mods, vk)
+        self._hk_label = label
+        self._hk_ok = bool(u32.RegisterHotKey(None, HOTKEY_ID, mods | MOD_NOREPEAT, vk))
+        if not self._hk_ok:
+            print(f"{label} ya está en uso por otro programa; el atajo no está disponible.")
         msg = wintypes.MSG()
         while True:
             r = u32.GetMessageW(ctypes.byref(msg), None, 0, 0)
@@ -2235,13 +2333,119 @@ class TaskWidget:
                 break
             if msg.message == WM_HOTKEY:
                 self._summon_flag = True      # bool: seguro entre threads (GIL)
-        u32.UnregisterHotKey(None, 1)         # desde el mismo hilo que registró
+            elif msg.message == WM_APP_REHK:
+                want = self._pending_hk
+                u32.UnregisterHotKey(None, HOTKEY_ID)
+                if want and u32.RegisterHotKey(None, HOTKEY_ID,
+                                               want[0] | MOD_NOREPEAT, want[1]):
+                    self._active_hk = want
+                    self._hk_ok = True
+                    self._hk_result = "ok"
+                else:                         # falló: restauro el anterior
+                    a = self._active_hk
+                    self._hk_ok = bool(a and u32.RegisterHotKey(
+                        None, HOTKEY_ID, a[0] | MOD_NOREPEAT, a[1]))
+                    self._hk_result = "fail"
+        u32.UnregisterHotKey(None, HOTKEY_ID)   # desde el mismo hilo que registró
 
     def _poll_summon(self):
         if self._summon_flag:
             self._summon_flag = False
             self._summon()
         self.root.after(150, self._poll_summon)
+
+    def _hk_refresh(self):
+        """Una vez al arrancar: si el atajo no se pudo registrar, muéstralo."""
+        if not self._hk_ok:
+            self.render()
+
+    # ------------------------------------------------------------------ atajo global
+    def _set_hotkey(self, combo):
+        parsed = parse_hotkey(combo)
+        if not parsed:
+            self._hk_msg("Combinación no válida — modificador + una tecla", ok=False)
+            return
+        mods, vk, label = parsed
+        if not (IS_WIN and self._hk_tid):
+            return
+        self._pending_hk = (mods, vk)
+        self._hk_result = None
+        u32.PostThreadMessageW(self._hk_tid, WM_APP_REHK, 0, 0)
+        self._hk_msg(f"Probando {label}…", ok=None)
+        self._poll_hk_result(combo, label, 0)
+
+    def _poll_hk_result(self, combo, label, n):
+        if self._hk_result is None:
+            if n < 40:
+                self.root.after(50, lambda: self._poll_hk_result(combo, label, n + 1))
+            return
+        if self._hk_result == "ok":
+            self.win["hotkey"] = combo
+            self._hk_label = label
+            self.save()
+            self._hk_msg(f"Atajo global: {label}", ok=True)
+        else:
+            self._hk_msg(f"{label} ya está en uso por otro programa — probá otra", ok=False)
+        self._hk_result = None
+        self.render()
+
+    def _hk_msg(self, text, ok):
+        lbl = getattr(self, "_hk_status_lbl", None)
+        if lbl is not None:
+            try:
+                lbl.config(text=text,
+                           fg=OVERDUE if ok is False else (FG if ok else FG_DIM))
+            except tk.TclError:
+                pass
+
+    def _capture_hotkey(self, btn):
+        self._cap = []
+        self._cap_btn = btn
+        btn.config(text="…")
+        self._hk_msg("Presioná la combinación   ·   Esc cancela", ok=None)
+        w = self._settings
+        w.bind("<KeyPress>", self._cap_key)
+        w.bind("<KeyRelease>", self._cap_rel)
+        w.focus_force()
+
+    def _cap_key(self, e):
+        if e.keysym == "Escape":
+            self._end_capture()
+            self._hk_msg(f"Atajo global: {self._hk_label}" if self._hk_ok
+                         else f"⚠ {self._hk_label} en uso — cambialo", ok=self._hk_ok)
+            return "break"
+        mod = _KS_MODS.get(e.keysym)
+        if mod:
+            if mod not in self._cap:
+                self._cap.append(mod)
+            return "break"
+        key = keysym_to_name(e.keysym)
+        if not key or not self._cap:
+            self._hk_msg("Necesitás un modificador (Ctrl/Alt/Shift/Win) + una tecla",
+                         ok=False)
+            return "break"
+        combo = "+".join(self._cap + [key])
+        self._end_capture()
+        self._set_hotkey(combo)
+        return "break"
+
+    def _cap_rel(self, e):
+        mod = _KS_MODS.get(e.keysym)
+        if mod and mod in self._cap:
+            self._cap.remove(mod)
+        return "break"
+
+    def _end_capture(self):
+        w = getattr(self, "_settings", None)
+        if w is not None and w.winfo_exists():
+            w.unbind("<KeyPress>")
+            w.unbind("<KeyRelease>")
+        btn = getattr(self, "_cap_btn", None)
+        if btn is not None:
+            try:
+                btn.config(text="Cambiar…")
+            except tk.TclError:
+                pass
 
     # ------------------------------------------------------------------ resize
     def _resize_start(self, e):
