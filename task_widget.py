@@ -22,6 +22,7 @@ import base64
 import json
 import os
 import queue
+import subprocess
 import sys
 import tempfile
 import threading
@@ -252,10 +253,9 @@ def win_dwm_flags(hwnd, dark):
 
 
 def win_register_app_id(icon_path=None):
-    """AUMID explícito del proceso. Sin esto, los globos del tray se muestran
-    como el globo viejo y se pierden; con un AUMID registrado pasan a ser
-    toasts que quedan en el Centro de notificaciones (Win+N), con nombre e
-    icono propios. Solo escribe en HKCU (sin admin, sin accesos directos)."""
+    """AUMID explícito del proceso + su registro en HKCU (nombre e icono).
+    Necesario para que Windows acepte los toasts de la app y para que la
+    ventana no se agrupe rara en la barra. Sin admin, sin accesos directos."""
     if not IS_WIN:
         return
     try:
@@ -270,6 +270,73 @@ def win_register_app_id(icon_path=None):
                 winreg.SetValueEx(k, "IconUri", 0, winreg.REG_SZ, icon_path)
     except OSError:
         pass
+
+
+# PowerShell arma el toast "de verdad" (Windows.UI.Notifications): a diferencia
+# del globo de Shell_NotifyIcon, éste queda guardado en el Centro de
+# notificaciones hasta que el usuario lo descarta. Título y cuerpo van por
+# variables de entorno (InnerText) → nada que escapar ni inyectar.
+_TOAST_PS1 = r"""
+$ErrorActionPreference = 'Stop'
+$aumid = $env:TT_AUMID
+$k = "HKCU:\Software\Classes\AppUserModelId\$aumid"
+if (-not (Test-Path $k)) { New-Item $k -Force | Out-Null }
+New-ItemProperty $k -Name DisplayName -Value $env:TT_NAME -PropertyType String -Force | Out-Null
+if ($env:TT_ICON -and (Test-Path $env:TT_ICON)) {
+    New-ItemProperty $k -Name IconUri -Value $env:TT_ICON -PropertyType String -Force | Out-Null
+}
+[Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType = WindowsRuntime] | Out-Null
+[Windows.Data.Xml.Dom.XmlDocument, Windows.Data.Xml.Dom, ContentType = WindowsRuntime] | Out-Null
+$d = New-Object Windows.Data.Xml.Dom.XmlDocument
+$toast = $d.CreateElement('toast'); $d.AppendChild($toast) | Out-Null
+$visual = $d.CreateElement('visual'); $toast.AppendChild($visual) | Out-Null
+$binding = $d.CreateElement('binding'); $binding.SetAttribute('template', 'ToastGeneric')
+$visual.AppendChild($binding) | Out-Null
+$t1 = $d.CreateElement('text'); $t1.InnerText = $env:TT_TITLE; $binding.AppendChild($t1) | Out-Null
+$t2 = $d.CreateElement('text'); $t2.InnerText = $env:TT_BODY; $binding.AppendChild($t2) | Out-Null
+$n = [Windows.UI.Notifications.ToastNotification]::new($d)
+[Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier($aumid).Show($n)
+"""
+
+
+def _powershell_exe():
+    p = os.path.join(os.environ.get("SystemRoot", r"C:\Windows"),
+                     "System32", "WindowsPowerShell", "v1.0", "powershell.exe")
+    if os.path.exists(p):
+        return p
+    from shutil import which
+    return which("powershell") or which("pwsh")
+
+
+def win_toast(title, body, icon_path=""):
+    """Muestra un toast persistente. Devuelve False si no se pudo lanzar
+    (sin PowerShell / no-Windows) para poder caer al globo del tray."""
+    if not IS_WIN:
+        return False
+    exe = _powershell_exe()
+    if not exe:
+        return False
+    env = dict(os.environ)
+    env.update(TT_AUMID=APP_AUMID, TT_NAME=APP_NAME, TT_ICON=icon_path or "",
+               TT_TITLE=str(title), TT_BODY=str(body))
+    enc = base64.b64encode(_TOAST_PS1.encode("utf-16-le")).decode("ascii")
+    flags = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
+
+    def _run():
+        try:
+            subprocess.run([exe, "-NoProfile", "-NonInteractive", "-Sta",
+                            "-ExecutionPolicy", "Bypass", "-EncodedCommand", enc],
+                           env=env, timeout=25, creationflags=flags,
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                           stdin=subprocess.DEVNULL, check=False)
+        except Exception:
+            pass
+
+    try:
+        threading.Thread(target=_run, daemon=True).start()
+        return True
+    except Exception:
+        return False
 
 
 # --------------------------------------------------------------------------- #
@@ -1207,15 +1274,12 @@ class TaskWidget:
         self.tray.update(tip, CUR_THEME == "dark")   # el icono acompaña al tema del widget
 
     def _due_watch(self):
-        """Cada 30 min: avisa (globo del tray) por tareas atrasadas o que vencen hoy."""
-        ready = bool(self.tray and self.tray.ok)
-        if ready:
-            self._scan_due()
-        # si el tray todavía no terminó de crearse, reintentar pronto
-        self._due_after = self.root.after(1_800_000 if ready else 5000, self._due_watch)
+        """Cada 30 min: avisa por tareas atrasadas o que vencen hoy."""
+        self._scan_due()
+        self._due_after = self.root.after(1_800_000, self._due_watch)
 
     def _scan_due(self):
-        if not (self.win.get("due_alerts", True) and self.tray and self.tray.ok):
+        if not self.win.get("due_alerts", True):
             return
         today = date.today()
         if self._due_day != today:            # día nuevo: se vuelve a avisar
@@ -1245,7 +1309,10 @@ class TaskWidget:
             if len(venc) > 3:
                 nombres += "…"
             msg = f"{len(venc)} tareas atrasadas o para hoy: {nombres}"
-        self.tray.balloon(APP_NAME, msg)
+        want = "dark" if CUR_THEME == "dark" else "light"
+        if not win_toast(APP_NAME, msg, _tray_ico_file(want)):
+            if self.tray:
+                self.tray.balloon(APP_NAME, msg)   # sin PowerShell: al menos el globo
 
     def _apply_win_icon(self):
         """Icono de los diálogos (Opciones) según el tema; default=True lo heredan."""

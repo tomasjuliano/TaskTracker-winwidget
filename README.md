@@ -167,10 +167,12 @@ icono de bandeja.
   Opciones ("Al cerrar, minimizar a la bandeja"), y "Salir" del tray cierra de
   verdad. La primera vez avisa con un globo. (#5)
 - **Aviso cuando una tarea vence**: cada 30 min revisa las tareas atrasadas o que
-  vencen hoy y lo notifica con un toast (una vez por día por tarea). Toggle en
-  Opciones ("Avisar cuando una tarea vence"). La app registra un AppUserModelID
-  propio (solo HKCU) para que los avisos queden guardados en el Centro de
-  notificaciones (`Win + N`) con nombre e icono propios, en vez de desaparecer. (#10)
+  vencen hoy y lo notifica con un toast de Windows (una vez por día por tarea).
+  Toggle en Opciones ("Avisar cuando una tarea vence"). El toast se arma vía
+  `Windows.UI.Notifications` (PowerShell, sin dependencias) y la app registra un
+  AppUserModelID propio en HKCU, así el aviso **queda guardado** en el Centro de
+  notificaciones (`Win + N`) con nombre e icono propios — el globo clásico de la
+  bandeja se borraba a los pocos segundos. (#10)
 
 **Arreglos**
 
