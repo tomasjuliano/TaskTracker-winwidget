@@ -1909,10 +1909,7 @@ class TaskWidget:
             d["moved"] = True
             if not self.win.get("manual_order"):
                 self._freeze_order()
-            try:
-                d["row"].configure(bg=BG_ROW_HI)
-            except tk.TclError:
-                pass
+            self._tint_row(d["row"], BG_ROW_HI)     # toda la fila, no sólo el marco
         cur = self._rows.index(d["row"])
         tgt = self._row_at(e.y_root)
         if tgt is not None and tgt != cur:
@@ -1942,6 +1939,19 @@ class TaskWidget:
             fr.pack_forget()
         for fr in self._rows:
             fr.pack(fill="x", padx=6, pady=2)
+
+    def _tint_row(self, row, color):
+        """Pinta el fondo de la fila y de todos sus hijos (marco, iconos y
+        labels) del mismo color — si no, al arrastrar la card los botones
+        quedan con el color viejo y se ve un parche."""
+        stack = [row]
+        while stack:
+            w = stack.pop()
+            try:
+                w.configure(bg=color)
+            except tk.TclError:
+                pass
+            stack.extend(w.winfo_children())
 
     # ------------------------------------------------------------------ calendario
     def _pick_due_for_new(self):
