@@ -177,6 +177,9 @@ icono de bandeja.
 - La rueda del mouse sólo scrollea la lista si el puntero está sobre ella
   (antes: `bind_all` global). (#7)
 - El atajo global se desregistra desde su propio hilo al cerrar. (#8)
+- **Instancia única**: si ya hay una corriendo, abrir el `.exe` de nuevo trae la
+  ventana existente al frente y no arranca una segunda (antes: dos instancias se
+  pisaban el `tasks.json`). Mutex con nombre + mensaje a la ventana del tray. (#2)
 
 ### v4 — 2026-09-05
 

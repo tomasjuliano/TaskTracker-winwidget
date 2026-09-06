@@ -141,6 +141,11 @@ if IS_WIN:
     TPM_RIGHTBUTTON, TPM_RETURNCMD = 0x0002, 0x0100
     MF_STRING, MF_SEPARATOR = 0x0000, 0x0800
     HWND_MESSAGE = -3
+    WS_POPUP = 0x80000000
+    ERROR_ALREADY_EXISTS = 183
+    TRAY_CLASS = "TaskTrackerTrayWnd"                    # también lo busca la 2da instancia
+    _SINGLE_NAME = r"Local\TaskTracker.SingleInstance"
+    _SINGLE_MUTEX = None
 
     _WNDPROC = ctypes.WINFUNCTYPE(ctypes.c_ssize_t, wintypes.HWND, wintypes.UINT,
                                   ctypes.c_size_t, ctypes.c_ssize_t)
@@ -187,6 +192,32 @@ if IS_WIN:
     u32.GetCursorPos.argtypes = [ctypes.c_void_p]
     _shell32.Shell_NotifyIconW.argtypes = [wintypes.DWORD, ctypes.c_void_p]
     _shell32.Shell_NotifyIconW.restype = wintypes.BOOL
+    u32.FindWindowW.argtypes = [wintypes.LPCWSTR, wintypes.LPCWSTR]
+    u32.FindWindowW.restype = _H
+    u32.RegisterWindowMessageW.argtypes = [wintypes.LPCWSTR]
+    u32.RegisterWindowMessageW.restype = wintypes.UINT
+    _k32.CreateMutexW.argtypes = [ctypes.c_void_p, wintypes.BOOL, wintypes.LPCWSTR]
+    _k32.CreateMutexW.restype = _H
+
+    WM_SHOW = u32.RegisterWindowMessageW("TaskTracker.ShowWindow")   # id único por sesión
+
+
+def single_instance_or_exit():
+    """Si ya hay otra instancia: le avisa que se muestre y termina esta."""
+    global _SINGLE_MUTEX
+    if not IS_WIN:
+        return
+    _SINGLE_MUTEX = _k32.CreateMutexW(None, False, _SINGLE_NAME)   # se mantiene viva
+    if _k32.GetLastError() != ERROR_ALREADY_EXISTS:
+        return
+    import time as _t
+    for _ in range(25):                       # la ventana del tray tarda un toque en existir
+        hwnd = u32.FindWindowW(TRAY_CLASS, None)
+        if hwnd:
+            u32.PostMessageW(hwnd, WM_SHOW, 0, 0)
+            break
+        _t.sleep(0.1)
+    sys.exit(0)
 
 
 def win_acrylic(hwnd, gradient_abgr, enabled=True):
@@ -218,7 +249,7 @@ def win_dwm_flags(hwnd, dark):
 # --------------------------------------------------------------------------- #
 #  Icono en la bandeja del sistema (tray)  —  Shell_NotifyIcon vía ctypes.
 #  Iconos: variante clara para barra oscura y viceversa (assets/tray_*.ico,
-#  embebidos en base64). Corre en su propio hilo con una ventana message-only;
+#  embebidos en base64). Corre en su propio hilo con una ventana top-level oculta
 #  las acciones vuelven al hilo principal por una cola.
 # --------------------------------------------------------------------------- #
 
@@ -407,11 +438,13 @@ class Tray:
             wc = _WNDCLASS()
             wc.lpfnWndProc = self._proc
             wc.hInstance = hinst
-            wc.lpszClassName = "TaskTrackerTray"
+            wc.lpszClassName = TRAY_CLASS
             if not u32.RegisterClassW(ctypes.byref(wc)):
                 return
-            self._hwnd = u32.CreateWindowExW(0, wc.lpszClassName, "tray", 0,
-                                             0, 0, 0, 0, HWND_MESSAGE, None, hinst, None)
+            # ventana top-level oculta (no message-only) para que FindWindow la vea
+            self._hwnd = u32.CreateWindowExW(WS_EX_TOOLWINDOW, wc.lpszClassName, APP_NAME,
+                                             WS_POPUP, -10000, -10000, 0, 0,
+                                             None, None, hinst, None)
             if not self._hwnd:
                 return
             nid = _NID()
@@ -443,6 +476,9 @@ class Tray:
                 self.queue.put("show")
             elif ev == WM_RBUTTONUP:
                 self._popup()
+            return 0
+        if msg == WM_SHOW:                     # 2da instancia pidió mostrar
+            self.queue.put("show")
             return 0
         if msg == WM_TRAY_SYNC:
             if self._nid:
@@ -1918,4 +1954,5 @@ class TaskWidget:
 
 
 if __name__ == "__main__":
+    single_instance_or_exit()     # una sola instancia: la 2da avisa a la 1ra y sale
     TaskWidget().run()
