@@ -539,7 +539,8 @@ DATA_FILE = os.path.join(APP_DIR, "tasks.json")
 DEFAULT_STATE = {
     "window": {"x": None, "y": None, "w": 310, "h": 340, "collapsed": False,
                "sized": False, "theme": "auto", "dim_opacity": None,
-               "close_to_tray": True, "tray_hint_shown": False},
+               "close_to_tray": True, "tray_hint_shown": False,
+               "always_on_top": False},
     "tasks": [],
 }
 
@@ -1062,6 +1063,8 @@ class TaskWidget:
         self._dragging = False
         self._hidden = False
         self._hk_tid = None
+        self._undo = None            # (tarea, índice) del último borrado
+        self._undo_after = None
         self.tray = None
 
         self.win.setdefault("theme", "auto")
@@ -1103,6 +1106,7 @@ class TaskWidget:
 
         self.root.bind("<FocusOut>", lambda e: self.root.after(200, self._on_focus_evt))
         self.root.bind("<FocusIn>", lambda e: self.root.after(1, self._on_focus_evt))
+        self.root.bind("<Control-z>", self._undo_delete)
         self.root.after(350, self._pin_to_desktop)
         self.root.after(500, self._snap_onscreen)   # recupera la ventana si quedó fuera de pantalla
         self.root.after(30000, self._autosave)
@@ -1187,6 +1191,7 @@ class TaskWidget:
         self.header = h
 
         title = tk.Label(h, text="  Tareas", bg=BG_HEADER, fg=FG, font=self.f_title)
+        self.title_lbl = title
         title.pack(side="left")
 
         btn_close = make_icon(h, "x", bg=BG_HEADER, command=self._close_click)
@@ -1252,8 +1257,11 @@ class TaskWidget:
                            font=self.f_small, anchor="w",
                            takefocus=0).pack(fill="x", pady=pad)
 
+        self._pin_var = tk.BooleanVar(value=self._pinned())
+        chk("Mantener siempre visible (sobre las demás ventanas)", self._pin_var,
+            self._toggle_pinned, (10, 0))
         if IS_WIN:
-            chk("Iniciar con Windows", self._autostart_var, self._toggle_autostart, (10, 0))
+            chk("Iniciar con Windows", self._autostart_var, self._toggle_autostart, (2, 0))
             self._tray_var = tk.BooleanVar(value=self.win.get("close_to_tray", True))
             chk("Al cerrar, minimizar a la bandeja", self._tray_var,
                 self._toggle_close_to_tray, (2, 0))
@@ -1380,18 +1388,38 @@ class TaskWidget:
             for idx in order:
                 self._row(idx, self.tasks[idx], wrap)
 
+        done_n = sum(1 for t in self.tasks if t.get("done"))
+        if self._undo:
+            self._footer_action(f"Tarea borrada  ·  Deshacer", self._undo_delete)
+        elif done_n:
+            self._footer_action(f"Limpiar {done_n} completada{'s' if done_n != 1 else ''}",
+                                self._clear_done)
+
         counts = {"alta": 0, "media": 0, "baja": 0}
+        pend = 0
         for t in self.tasks:
             if not t["done"]:
                 counts[t.get("priority", "media")] += 1
+                pend += 1
         for p, lbl in self.cnt_lbl.items():
             lbl.config(text=f"●{counts[p]}")
+        self.title_lbl.config(
+            text=f"  Tareas · {pend}" if (self.win["collapsed"] and pend) else "  Tareas")
 
         self.root.update_idletasks()
         self.canvas.configure(scrollregion=self.canvas.bbox("all"))
         self._sync_scrollbar()
         self._sync_tray()
         self.save()
+
+    def _footer_action(self, text, cmd):
+        """Enlace discreto al pie de la lista (limpiar completadas / deshacer)."""
+        lbl = tk.Label(self.list_frame, text=text, bg=BG, fg=FG_DIM,
+                       font=self.f_small, cursor="hand2")
+        lbl.pack(pady=(6, 8))
+        lbl.bind("<Button-1>", lambda e: cmd())
+        lbl.bind("<Enter>", lambda e: lbl.config(fg=ACCENT))
+        lbl.bind("<Leave>", lambda e: lbl.config(fg=FG_DIM))
 
     def _row(self, idx, task, wrap):
         row = tk.Frame(self.list_frame, bg=BG_ROW)
@@ -1530,7 +1558,28 @@ class TaskWidget:
         self.render()
 
     def delete_task(self, i):
-        del self.tasks[i]
+        self._undo = (self.tasks.pop(i), i)         # se puede deshacer un rato
+        if self._undo_after:
+            self.root.after_cancel(self._undo_after)
+        self._undo_after = self.root.after(6000, self._clear_undo)
+        self.render()
+
+    def _undo_delete(self, _=None):
+        if not self._undo:
+            return
+        task, i = self._undo
+        self.tasks.insert(min(i, len(self.tasks)), task)
+        self._clear_undo()
+
+    def _clear_undo(self):
+        self._undo = None
+        if self._undo_after:
+            self.root.after_cancel(self._undo_after)
+            self._undo_after = None
+        self.render()
+
+    def _clear_done(self, _=None):
+        self.tasks = [t for t in self.tasks if not t.get("done")]
         self.render()
 
     def cycle_prio(self, i):
@@ -1581,6 +1630,9 @@ class TaskWidget:
             self.save()
 
     # ------------------------------------------------------------------ escritorio / z-order
+    def _pinned(self):
+        return self.win.get("always_on_top", False)
+
     def _pin_to_desktop(self):
         if not IS_WIN:
             return
@@ -1592,6 +1644,13 @@ class TaskWidget:
             self._send_to_bottom()
         except Exception as exc:
             print("No se pudo fijar al escritorio:", exc)
+
+    def _toggle_pinned(self):
+        self.win["always_on_top"] = self._pin_var.get()
+        self._apply_glass()
+        if not self._pinned():
+            self._send_to_bottom()
+        self.save()
 
     # ------------------------------------------------------------------ estética / tema
     def _has_focus(self):
@@ -1608,8 +1667,19 @@ class TaskWidget:
 
     def _on_focus_evt(self):
         """Con foco → panel sólido (casi opaco, sin blur), para trabajar.
-        Sin foco → translúcido con el blur del escritorio detrás, se funde al fondo."""
+        Sin foco → translúcido con el blur del escritorio detrás, se funde al fondo.
+        "Siempre visible" → siempre sólido y arriba de todo."""
         if self.win["collapsed"]:
+            return
+        if self._pinned():
+            try:
+                self.root.attributes("-alpha", WIN_ALPHA)
+                self.root.attributes("-topmost", True)
+            except tk.TclError:
+                pass
+            if IS_WIN and self._hwnd:
+                win_acrylic(self._hwnd, WIN_TINT, enabled=False)
+                self._glass_on = False
             return
         focused = self._has_focus()
         dim_a = self.win.get("dim_opacity") or WIN_ALPHA_DIM
@@ -1666,12 +1736,12 @@ class TaskWidget:
         self.save()
 
     def _send_to_bottom(self):
-        if IS_WIN and self._hwnd and not self.win["collapsed"]:
+        if IS_WIN and self._hwnd and not self.win["collapsed"] and not self._pinned():
             u32.SetWindowPos(self._hwnd, HWND_BOTTOM, 0, 0, 0, 0,
                              SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE)
 
     def _maybe_lower(self):
-        if self._editing or self.win["collapsed"] or self._hidden:
+        if self._editing or self.win["collapsed"] or self._hidden or self._pinned():
             return
         if self.root.focus_displayof() is None:
             self._send_to_bottom()
@@ -1696,7 +1766,7 @@ class TaskWidget:
         self.e_text.focus_set()
 
     def _drop_topmost(self):
-        if not self.win["collapsed"]:
+        if not self.win["collapsed"] and not self._pinned():
             try:
                 self.root.attributes("-topmost", False)
             except tk.TclError:

@@ -74,7 +74,8 @@ administrador y se puede desmarcar en cualquier momento.
 | Editar texto | Doble clic en el texto de la tarea |
 | Editar / poner fecha | Clic en la fecha de la tarea (o `＋ fecha`) |
 | Menú completo de una tarea | Clic derecho sobre la tarea |
-| Borrar | Clic en la `✕` que aparece al pasar el mouse por la fila |
+| Borrar | Clic en la `✕` que aparece al pasar el mouse por la fila (`Ctrl+Z` / "Deshacer" para recuperar) |
+| Limpiar completadas | Enlace "Limpiar N completadas" al pie de la lista |
 | Opciones (tema, iniciar con Windows, opacidad) | Botón `⚙` o clic derecho en la barra de título |
 | Mostrar / ocultar · salir | Icono de la bandeja del sistema (clic izq. muestra, clic der. abre el menú) |
 
@@ -180,6 +181,11 @@ icono de bandeja.
 - **Instancia única**: si ya hay una corriendo, abrir el `.exe` de nuevo trae la
   ventana existente al frente y no arranca una segunda (antes: dos instancias se
   pisaban el `tasks.json`). Mutex con nombre + mensaje a la ventana del tray. (#2)
+- Colapsado, el título muestra los **pendientes** (`Tareas · 3`). (#12)
+- Enlace **"Limpiar N completadas"** al pie de la lista. (#13)
+- **Deshacer** al borrar una tarea: enlace al pie por unos segundos, o `Ctrl+Z`. (#21)
+- Opción **"Mantener siempre visible"** en Opciones — el widget queda sobre las
+  demás ventanas en vez de a nivel escritorio. (#15)
 
 ### v4 — 2026-09-05
 
