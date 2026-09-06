@@ -149,6 +149,8 @@ icono de bandeja.
 
 ### Sin publicar
 
+**Nuevo**
+
 - **Icono en la bandeja del sistema** (`Shell_NotifyIcon` vía `ctypes`, sin
   dependencias). Clic izq. muestra/trae al frente el widget; clic der. abre un
   menú (mostrar/ocultar · opciones · salir). El icono cambia claro/oscuro con el
@@ -156,6 +158,22 @@ icono de bandeja.
   tooltip muestra los pendientes. (#18)
 - **Icono propio del `.exe`** (`assets/icon.ico`, de `assets/icon-light.svg`),
   enchufado al build local y a Actions. (#17)
+- La app se presenta ante Windows como **TaskTracker** (título, Alt+Tab, tray);
+  el encabezado del widget sigue diciendo **Tareas**. (#19)
+- La ventana de **Opciones** usa el icono de la app según el tema (antes: la
+  pluma de Tk). (#20)
+
+**Arreglos**
+
+- Tooltips legibles en tema claro (antes: fondo negro + texto negro). (#1)
+- Se elimina la fuga de objetos `Font` al renderizar tareas completadas. (#3)
+- La edición inline ya no puede dejar el widget "pegado" al frente si no se
+  confirma. (#4)
+- El campo "venc." ya no queda con el placeholder pegado al texto al agregar
+  una tarea con Enter desde ese campo. (#6)
+- La rueda del mouse sólo scrollea la lista si el puntero está sobre ella
+  (antes: `bind_all` global). (#7)
+- El atajo global se desregistra desde su propio hilo al cerrar. (#8)
 
 ### v4 — 2026-09-05
 

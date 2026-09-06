@@ -50,6 +50,7 @@ if IS_WIN:
     MOD_CONTROL  = 0x0002
     MOD_NOREPEAT = 0x4000
     WM_HOTKEY    = 0x0312
+    WM_QUIT      = 0x0012
     VK_T         = 0x54
 
     # argtypes correctos: sin esto, en Windows de 64 bits los HWND se truncan
@@ -66,6 +67,10 @@ if IS_WIN:
     u32.GetMessageW.argtypes = [ctypes.POINTER(wintypes.MSG), wintypes.HWND,
                                 wintypes.UINT, wintypes.UINT]
     u32.GetMessageW.restype = ctypes.c_int
+    u32.PostThreadMessageW.argtypes = [wintypes.DWORD, wintypes.UINT,
+                                       ctypes.c_size_t, ctypes.c_ssize_t]
+    u32.PostThreadMessageW.restype = wintypes.BOOL
+    ctypes.windll.kernel32.GetCurrentThreadId.restype = wintypes.DWORD
     _GWLP = getattr(u32, "GetWindowLongPtrW", u32.GetWindowLongW)
     _SWLP = getattr(u32, "SetWindowLongPtrW", u32.SetWindowLongW)
     _GWLP.argtypes = [wintypes.HWND, ctypes.c_int]
@@ -473,6 +478,8 @@ class Tray:
             self.queue.put(act)
 
 
+APP_NAME = "TaskTracker"       # nombre para Windows (título, tray, Alt+Tab)
+
 # --------------------------------------------------------------------------- #
 #  Persistencia
 # --------------------------------------------------------------------------- #
@@ -803,6 +810,72 @@ _ICON_B64 = {
 
 _ICON_CACHE = {}
 
+# Icono de las ventanas con barra de título (el diálogo de Opciones). PNG 48 px,
+# variante clara / oscura sin las marcas del reloj.
+_WIN_ICON_B64 = {
+    "light": (
+        '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'
+    ),
+    "dark": (
+        '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'
+    ),
+}
+
 
 def _get_icon(key):
     img = _ICON_CACHE.get(key)
@@ -938,13 +1011,14 @@ class TaskWidget:
         self._glass_on = False
         self._dragging = False
         self._hidden = False
+        self._hk_tid = None
         self.tray = None
 
         self.win.setdefault("theme", "auto")
         apply_theme(resolve_theme(self.win["theme"]))
 
         self.root = tk.Tk()
-        self.root.title("Tareas")
+        self.root.title(APP_NAME)          # nombre para Windows; el encabezado dice "Tareas"
         self.root.overrideredirect(True)
         self.root.attributes("-alpha", WIN_ALPHA)
         self.root.configure(bg=BG, highlightthickness=1,
@@ -954,9 +1028,13 @@ class TaskWidget:
         self.root.geometry(f"{self.win['w']}x{self.win['h']}+{self.win['x']}+{self.win['y']}")
         self.root.protocol("WM_DELETE_WINDOW", self.quit)
 
-        self.f_title = tkfont.Font(family="Segoe UI", size=10, weight="bold")
-        self.f_body  = tkfont.Font(family="Segoe UI", size=10)
-        self.f_small = tkfont.Font(family="Segoe UI", size=8)
+        self.f_title  = tkfont.Font(family="Segoe UI", size=10, weight="bold")
+        self.f_body   = tkfont.Font(family="Segoe UI", size=10)
+        self.f_small  = tkfont.Font(family="Segoe UI", size=8)
+        self.f_strike = tkfont.Font(family="Segoe UI", size=10, overstrike=True)
+
+        self._win_icon = None
+        self._apply_win_icon()
 
         self._autostart_var = tk.BooleanVar(value=autostart_enabled())
         if self._autostart_var.get():
@@ -1024,8 +1102,17 @@ class TaskWidget:
         if not self.tray:
             return
         pend = sum(1 for t in self.tasks if not t.get("done"))
-        tip = "Tareas" if not pend else f"Tareas — {pend} pendiente{'s' if pend != 1 else ''}"
+        tip = APP_NAME if not pend else f"{APP_NAME} — {pend} pendiente{'s' if pend != 1 else ''}"
         self.tray.update(tip, CUR_THEME == "dark")   # el icono acompaña al tema del widget
+
+    def _apply_win_icon(self):
+        """Icono de los diálogos (Opciones) según el tema; default=True lo heredan."""
+        try:
+            self._win_icon = tk.PhotoImage(
+                data=_WIN_ICON_B64["dark" if CUR_THEME == "dark" else "light"])
+            self.root.iconphoto(True, self._win_icon)
+        except tk.TclError:
+            pass
 
     # ------------------------------------------------------------------ UI
     def _build_header(self):
@@ -1198,6 +1285,7 @@ class TaskWidget:
 
     # ------------------------------------------------------------------ render
     def render(self):
+        self._editing = False        # cualquier edición inline en curso ya no existe
         for w in self.list_frame.winfo_children():
             w.destroy()
 
@@ -1252,11 +1340,9 @@ class TaskWidget:
 
         txt = tk.Label(mid, text=task["text"], bg=BG_ROW,
                        fg=FG_DIM if task["done"] else FG,
-                       font=self.f_body, anchor="w", justify="left", wraplength=wrap)
+                       font=self.f_strike if task["done"] else self.f_body,
+                       anchor="w", justify="left", wraplength=wrap)
         txt.pack(fill="x", anchor="w")
-        if task["done"]:
-            f = tkfont.Font(font=self.f_body); f.configure(overstrike=True)
-            txt.config(font=f)
         txt.bind("<Double-Button-1>", lambda e, i=idx, m=mid: self._edit_inline(i, m, "text"))
 
         dl, dcolor = due_label(task.get("due", ""))
@@ -1358,7 +1444,11 @@ class TaskWidget:
         })
         self.e_text.delete(0, "end")
         self.e_due.delete(0, "end")
-        self._set_placeholder(self.e_due, "venc.")
+        if self.e_due is self.root.focus_get():
+            self.e_due._is_ph = False          # con foco: dejar vacío; el placeholder
+            self.e_due.config(fg=FG)           # vuelve solo al perder el foco
+        else:
+            self._set_placeholder(self.e_due, "venc.")
         self.render()
 
     def toggle_done(self, i):
@@ -1496,6 +1586,7 @@ class TaskWidget:
         except Exception:
             pass
         self.render()
+        self._apply_win_icon()
         self._apply_glass()
         self._send_to_bottom()
         self.save()
@@ -1539,16 +1630,18 @@ class TaskWidget:
 
     # ------------------------------------------------------------------ atajo global (Win)
     def _hotkey_loop(self):
+        self._hk_tid = ctypes.windll.kernel32.GetCurrentThreadId()
         if not u32.RegisterHotKey(None, 1, MOD_CONTROL | MOD_ALT | MOD_NOREPEAT, VK_T):
             print("Ctrl+Alt+T ya está en uso por otro programa; el atajo no estará disponible.")
             return
         msg = wintypes.MSG()
         while True:
             r = u32.GetMessageW(ctypes.byref(msg), None, 0, 0)
-            if r in (0, -1):
+            if r in (0, -1):              # 0 = WM_QUIT (lo manda quit())
                 break
             if msg.message == WM_HOTKEY:
                 self._summon_flag = True      # bool: seguro entre threads (GIL)
+        u32.UnregisterHotKey(None, 1)         # desde el mismo hilo que registró
 
     def _poll_summon(self):
         if self._summon_flag:
@@ -1604,6 +1697,17 @@ class TaskWidget:
             self.scroll.pack_forget()
 
     def _on_wheel(self, event):
+        # bind_all es global: sólo scrollear si el puntero está sobre la lista
+        try:
+            w = self.root.winfo_containing(event.x_root, event.y_root)
+        except (KeyError, tk.TclError):
+            return
+        while w is not None:
+            if w is self.canvas or w is self.list_frame:
+                break
+            w = getattr(w, "master", None)
+        else:
+            return
         if self.list_frame.winfo_reqheight() > self.canvas.winfo_height():
             self.canvas.yview_scroll(int(-event.delta / 120), "units")
 
@@ -1734,9 +1838,10 @@ class TaskWidget:
             tw = tk.Toplevel(widget)
             tw.overrideredirect(True)
             tw.attributes("-topmost", True)
+            tw.configure(bg=BORDER)
             tw.geometry(f"+{x}+{y}")
-            tk.Label(tw, text=text, bg="#000000", fg=FG, font=self.f_small,
-                     padx=6, pady=2).pack()
+            tk.Label(tw, text=text, bg=BG_HEADER, fg=FG, font=self.f_small,
+                     padx=7, pady=3).pack(padx=1, pady=1)     # borde fino con BORDER
             tip["win"] = tw
 
         def hide(_):
@@ -1759,8 +1864,11 @@ class TaskWidget:
     def quit(self):
         self.save()
         if IS_WIN:
-            try:
-                u32.UnregisterHotKey(None, 1)
+            try:                        # despierta al hilo del atajo para que salga limpio
+                if self._hk_tid:
+                    u32.PostThreadMessageW(self._hk_tid, WM_QUIT, 0, 0)
+                else:
+                    u32.UnregisterHotKey(None, 1)
             except Exception:
                 pass
             if self.tray:
