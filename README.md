@@ -65,7 +65,7 @@ administrador y se puede desmarcar en cualquier momento.
 | Redimensionar | Arrastrar la franja fina de abajo |
 | Colapsar / expandir | Botón `–`, doble clic en el título, o `Ctrl+Alt+T` |
 | Traer al frente | `Ctrl+Alt+T` |
-| Cerrar | Botón `✕` |
+| Minimizar a la bandeja | Botón `✕` (o "Salir" en el tray para cerrar de verdad) |
 | Agregar tarea | Escribir abajo → Enter (o el `+`) |
 | Prioridad de la nueva tarea | Clic en el `●` de la izquierda (baja → media → alta) |
 | Fecha de vencimiento | Campo "venc." — acepta `11/09`, `2026-09-11`, `11/09/2026` |
@@ -162,6 +162,9 @@ icono de bandeja.
   el encabezado del widget sigue diciendo **Tareas**. (#19)
 - La ventana de **Opciones** usa el icono de la app según el tema (antes: la
   pluma de Tk). (#20)
+- La **✕** minimiza a la bandeja en vez de cerrar (como Discord); toggle en
+  Opciones ("Al cerrar, minimizar a la bandeja"), y "Salir" del tray cierra de
+  verdad. La primera vez avisa con un globo. (#5)
 
 **Arreglos**
 

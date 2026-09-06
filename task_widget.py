@@ -8,6 +8,7 @@ Task Widget - un tracker de tareas para el escritorio de Windows.
 - Atajo global  Ctrl + Alt + T  para traerlo al frente desde cualquier lado.
 - Icono en la bandeja del sistema: clic izq = mostrar/traer al frente; clic der =
   menú (mostrar/ocultar, opciones, salir). El icono acompaña el tema del widget.
+- La ✕ minimiza a la bandeja (configurable en Opciones); "Salir" cierra de verdad.
 - Ventana redimensionable (arrastrar la franja fina de abajo).
 - Editar: doble clic en el texto o en la fecha de una tarea; clic derecho = menú.
 - Botón "⚙" (o clic derecho en la barra): tema, iniciar con Windows, opacidad.
@@ -131,7 +132,8 @@ if IS_WIN:
     _shell32 = ctypes.windll.shell32
     _k32 = ctypes.windll.kernel32
     NIM_ADD, NIM_MODIFY, NIM_DELETE = 0, 1, 2
-    NIF_MESSAGE, NIF_ICON, NIF_TIP = 0x01, 0x02, 0x04
+    NIF_MESSAGE, NIF_ICON, NIF_TIP, NIF_INFO = 0x01, 0x02, 0x04, 0x10
+    NIIF_INFO = 0x01
     WM_TRAY, WM_TRAY_SYNC, WM_TRAY_QUIT = 0x8001, 0x8002, 0x8003   # WM_APP + n
     WM_LBUTTONUP, WM_LBUTTONDBLCLK, WM_RBUTTONUP = 0x0202, 0x0203, 0x0205
     WM_DESTROY, WM_SETTINGCHANGE = 0x0002, 0x001A
@@ -366,6 +368,7 @@ class Tray:
         self._icons = {}
         self._nid = None
         self._proc = None            # ref viva del callback (si no, lo barre el GC)
+        self._balloon = None
         self.ok = False
         threading.Thread(target=self._run, daemon=True).start()
 
@@ -373,6 +376,11 @@ class Tray:
     def update(self, tip, dark):
         self._tip = (tip or "Tareas")[:127]
         self._dark = bool(dark)
+        if self._hwnd:
+            u32.PostMessageW(self._hwnd, WM_TRAY_SYNC, 0, 0)
+
+    def balloon(self, title, msg):
+        self._balloon = (title[:63], msg[:255])
         if self._hwnd:
             u32.PostMessageW(self._hwnd, WM_TRAY_SYNC, 0, 0)
 
@@ -441,6 +449,11 @@ class Tray:
                 self._nid.uFlags = NIF_ICON | NIF_TIP
                 self._nid.hIcon = self._icon()
                 self._nid.szTip = self._tip
+                if self._balloon:
+                    self._nid.uFlags |= NIF_INFO
+                    self._nid.szInfoTitle, self._nid.szInfo = self._balloon
+                    self._nid.dwInfoFlags = NIIF_INFO
+                    self._balloon = None
                 _shell32.Shell_NotifyIconW(NIM_MODIFY, ctypes.byref(self._nid))
             return 0
         if msg == WM_TRAY_QUIT:
@@ -489,7 +502,8 @@ DATA_FILE = os.path.join(APP_DIR, "tasks.json")
 
 DEFAULT_STATE = {
     "window": {"x": None, "y": None, "w": 310, "h": 340, "collapsed": False,
-               "sized": False, "theme": "auto", "dim_opacity": None},
+               "sized": False, "theme": "auto", "dim_opacity": None,
+               "close_to_tray": True, "tray_hint_shown": False},
     "tasks": [],
 }
 
@@ -1026,7 +1040,7 @@ class TaskWidget:
         if self.win.get("x") is None or self.win.get("y") is None:
             self.win["x"], self.win["y"] = self._default_pos()   # esquina sup. derecha
         self.root.geometry(f"{self.win['w']}x{self.win['h']}+{self.win['x']}+{self.win['y']}")
-        self.root.protocol("WM_DELETE_WINDOW", self.quit)
+        self.root.protocol("WM_DELETE_WINDOW", self._close_click)
 
         self.f_title  = tkfont.Font(family="Segoe UI", size=10, weight="bold")
         self.f_body   = tkfont.Font(family="Segoe UI", size=10)
@@ -1098,6 +1112,21 @@ class TaskWidget:
             self.root.deiconify()
         self._summon()
 
+    def _close_click(self, _=None):
+        """La ✕: manda a la bandeja (como Discord) o cierra, según Opciones."""
+        if self.win.get("close_to_tray", True) and self.tray and self.tray.ok:
+            self._hidden = True
+            self.root.withdraw()
+            if not self.win.get("tray_hint_shown"):
+                self.win["tray_hint_shown"] = True
+                self.save()
+                self.tray.balloon(
+                    APP_NAME,
+                    "Sigue corriendo en la bandeja. Clic derecho en el icono → "
+                    "Salir para cerrarlo.")
+        else:
+            self.quit()
+
     def _sync_tray(self):
         if not self.tray:
             return
@@ -1124,7 +1153,7 @@ class TaskWidget:
         title = tk.Label(h, text="  Tareas", bg=BG_HEADER, fg=FG, font=self.f_title)
         title.pack(side="left")
 
-        btn_close = make_icon(h, "x", bg=BG_HEADER, command=lambda e: self.quit())
+        btn_close = make_icon(h, "x", bg=BG_HEADER, command=self._close_click)
         btn_close.pack(side="right", padx=(2, 6))
 
         btn_col = make_icon(h, "minus", bg=BG_HEADER,
@@ -1181,12 +1210,17 @@ class TaskWidget:
                            activeforeground=FG, font=self.f_small,
                            takefocus=0).pack(side="left", padx=(0, 6))
 
-        if IS_WIN:
-            tk.Checkbutton(t, text="Iniciar con Windows", variable=self._autostart_var,
-                           command=self._toggle_autostart, bg=BG, fg=FG,
+        def chk(text, var, cmd, pad):
+            tk.Checkbutton(t, text=text, variable=var, command=cmd, bg=BG, fg=FG,
                            selectcolor=BG_INPUT, activebackground=BG, activeforeground=FG,
                            font=self.f_small, anchor="w",
-                           takefocus=0).pack(fill="x", pady=(10, 0))
+                           takefocus=0).pack(fill="x", pady=pad)
+
+        if IS_WIN:
+            chk("Iniciar con Windows", self._autostart_var, self._toggle_autostart, (10, 0))
+            self._tray_var = tk.BooleanVar(value=self.win.get("close_to_tray", True))
+            chk("Al cerrar, minimizar a la bandeja", self._tray_var,
+                self._toggle_close_to_tray, (2, 0))
 
         sub("Opacidad cuando no está en foco")
         cur = int(round((self.win.get("dim_opacity") or WIN_ALPHA_DIM) * 100))
@@ -1216,6 +1250,10 @@ class TaskWidget:
         want = self._autostart_var.get()
         if not set_autostart(want):
             self._autostart_var.set(not want)      # falló: dejar el check como estaba
+
+    def _toggle_close_to_tray(self):
+        self.win["close_to_tray"] = self._tray_var.get()
+        self.save()
 
     def _build_body(self):
         self.body = tk.Frame(self.root, bg=BG)
