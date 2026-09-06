@@ -12,6 +12,9 @@ Un tracker de tareas que vive en el escritorio de Windows. Python + tkinter,
   redimensionable.
 - **Tema claro / oscuro / automático**, con estética translúcida tipo *glass*
   (blur acrylic de Windows por detrás en el tema oscuro).
+- **Icono en la bandeja del sistema**: clic izquierdo lo muestra/trae al frente,
+  clic derecho abre el menú (mostrar/ocultar · opciones · salir). El icono cambia
+  claro/oscuro según el tema de Windows, y el tooltip muestra los pendientes.
 - Todo se guarda en `tasks.json`, al lado del script.
 
 ---
@@ -73,6 +76,7 @@ administrador y se puede desmarcar en cualquier momento.
 | Menú completo de una tarea | Clic derecho sobre la tarea |
 | Borrar | Clic en la `✕` que aparece al pasar el mouse por la fila |
 | Opciones (tema, iniciar con Windows, opacidad) | Botón `⚙` o clic derecho en la barra de título |
+| Mostrar / ocultar · salir | Icono de la bandeja del sistema (clic izq. muestra, clic der. abre el menú) |
 
 ### Estética "glass" — límites
 
@@ -142,6 +146,16 @@ icono de bandeja.
 ---
 
 ## Changelog
+
+### Sin publicar
+
+- **Icono en la bandeja del sistema** (`Shell_NotifyIcon` vía `ctypes`, sin
+  dependencias). Clic izq. muestra/trae al frente el widget; clic der. abre un
+  menú (mostrar/ocultar · opciones · salir). El icono cambia claro/oscuro con el
+  tema de Windows y reacciona cuando lo cambiás en caliente; el tooltip muestra
+  los pendientes. (#18)
+- **Icono propio del `.exe`** (`assets/icon.ico`, de `assets/icon-light.svg`),
+  enchufado al build local y a Actions. (#17)
 
 ### v4 — 2026-09-05
 
