@@ -540,7 +540,7 @@ DEFAULT_STATE = {
     "window": {"x": None, "y": None, "w": 310, "h": 340, "collapsed": False,
                "sized": False, "theme": "auto", "dim_opacity": None,
                "close_to_tray": True, "tray_hint_shown": False,
-               "always_on_top": False},
+               "always_on_top": False, "due_alerts": True},
     "tasks": [],
 }
 
@@ -1066,6 +1066,9 @@ class TaskWidget:
         self._undo = None            # (tarea, índice) del último borrado
         self._undo_after = None
         self.tray = None
+        self._due_after = None
+        self._due_notified = set()   # ids de tareas ya avisadas (por día)
+        self._due_day = None
 
         self.win.setdefault("theme", "auto")
         apply_theme(resolve_theme(self.win["theme"]))
@@ -1118,6 +1121,7 @@ class TaskWidget:
             self.tray = Tray()
             self.root.after(400, self._poll_tray)
             self.root.after(600, self._sync_tray)
+            self.root.after(8000, self._due_watch)
 
     # ------------------------------------------------------------------ bandeja (tray)
     def _poll_tray(self):
@@ -1173,6 +1177,44 @@ class TaskWidget:
         pend = sum(1 for t in self.tasks if not t.get("done"))
         tip = APP_NAME if not pend else f"{APP_NAME} — {pend} pendiente{'s' if pend != 1 else ''}"
         self.tray.update(tip, CUR_THEME == "dark")   # el icono acompaña al tema del widget
+
+    def _due_watch(self):
+        """Cada 30 min: avisa (globo del tray) por tareas atrasadas o que vencen hoy."""
+        self._scan_due()
+        self._due_after = self.root.after(1_800_000, self._due_watch)
+
+    def _scan_due(self):
+        if not (self.win.get("due_alerts", True) and self.tray and self.tray.ok):
+            return
+        today = date.today()
+        if self._due_day != today:            # día nuevo: se vuelve a avisar
+            self._due_day = today
+            self._due_notified = set()
+        venc = []
+        for t in self.tasks:
+            if t.get("done") or t.get("id") in self._due_notified:
+                continue
+            try:
+                d = date.fromisoformat(t.get("due") or "")
+            except ValueError:
+                continue
+            if d <= today:
+                venc.append((d, t))
+        if not venc:
+            return
+        for _, t in venc:
+            self._due_notified.add(t.get("id"))
+        if len(venc) == 1:
+            d, t = venc[0]
+            atraso = (today - d).days
+            estado = "vence hoy" if atraso == 0 else f"atrasada {atraso}d"
+            msg = f"«{t['text']}» — {estado}"
+        else:
+            nombres = ", ".join(t["text"] for _, t in venc[:3])
+            if len(venc) > 3:
+                nombres += "…"
+            msg = f"{len(venc)} tareas atrasadas o para hoy: {nombres}"
+        self.tray.balloon(APP_NAME, msg)
 
     def _apply_win_icon(self):
         """Icono de los diálogos (Opciones) según el tema; default=True lo heredan."""
@@ -1265,6 +1307,9 @@ class TaskWidget:
             self._tray_var = tk.BooleanVar(value=self.win.get("close_to_tray", True))
             chk("Al cerrar, minimizar a la bandeja", self._tray_var,
                 self._toggle_close_to_tray, (2, 0))
+            self._due_var = tk.BooleanVar(value=self.win.get("due_alerts", True))
+            chk("Avisar cuando una tarea vence", self._due_var,
+                self._toggle_due_alerts, (2, 0))
 
         sub("Opacidad cuando no está en foco")
         cur = int(round((self.win.get("dim_opacity") or WIN_ALPHA_DIM) * 100))
@@ -1298,6 +1343,13 @@ class TaskWidget:
     def _toggle_close_to_tray(self):
         self.win["close_to_tray"] = self._tray_var.get()
         self.save()
+
+    def _toggle_due_alerts(self):
+        self.win["due_alerts"] = self._due_var.get()
+        self.save()
+        if self.win["due_alerts"]:
+            self._due_notified.clear()      # re-evaluar todo y avisar ahora
+            self._scan_due()
 
     def _build_body(self):
         self.body = tk.Frame(self.root, bg=BG)
@@ -1503,6 +1555,7 @@ class TaskWidget:
                         self.tasks[idx]["text"] = val
                 else:
                     self.tasks[idx]["due"] = parse_due(val)
+                    self._due_notified.discard(self.tasks[idx].get("id"))
             self.render()
 
         e.bind("<Return>", lambda ev: finish(True))

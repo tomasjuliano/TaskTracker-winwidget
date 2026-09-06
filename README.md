@@ -166,6 +166,9 @@ icono de bandeja.
 - La **✕** minimiza a la bandeja en vez de cerrar (como Discord); toggle en
   Opciones ("Al cerrar, minimizar a la bandeja"), y "Salir" del tray cierra de
   verdad. La primera vez avisa con un globo. (#5)
+- **Aviso cuando una tarea vence**: cada 30 min revisa las tareas atrasadas o que
+  vencen hoy y lo notifica con un globo del tray (una vez por día por tarea).
+  Toggle en Opciones ("Avisar cuando una tarea vence"). (#10)
 
 **Arreglos**
 
