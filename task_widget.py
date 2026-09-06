@@ -19,6 +19,7 @@ Arranque:  pythonw task_widget.py
 """
 
 import base64
+import calendar
 import json
 import os
 import queue
@@ -1092,6 +1093,9 @@ def make_icon(parent, name, *, bg, command=None):
 
 MESES = ["ene", "feb", "mar", "abr", "may", "jun",
          "jul", "ago", "sep", "oct", "nov", "dic"]
+MESES_L = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio",
+           "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"]
+DIAS_MIN = ["L", "M", "M", "J", "V", "S", "D"]        # semana arranca lunes
 
 MIN_W, MIN_H = 250, 170
 
@@ -1148,6 +1152,7 @@ class TaskWidget:
         self._drag = (0, 0)
         self._rows = []               # frames de fila en orden visual
         self._rowdrag = None          # arrastre de una fila para reordenar
+        self._cal = None              # popup del calendario
         self._rs = None
         self._rs_target = None
         self._rs_pending = None
@@ -1500,10 +1505,14 @@ class TaskWidget:
         btn_add = make_icon(add, "plus", bg=BG_HEADER, command=lambda e: self.add_task())
         btn_add.pack(side="right", padx=(4, 6), pady=6)
 
+        cal_btn = self._cal_button(add, BG_HEADER, self._pick_due_for_new)
+        cal_btn.pack(side="right", padx=(0, 2), pady=6)
+        self._tooltip(cal_btn, "Elegir la fecha en un calendario")
+
         due_wrap = RoundEntry(add, small=True, bg=BG_INPUT, fg=FG_DIM,
                               insertbackground=FG, font=self.f_small,
                               width=6, justify="center")
-        due_wrap.configure(width=62, height=27)
+        due_wrap.configure(width=58, height=27)
         due_wrap.pack_propagate(False)
         due_wrap.pack(side="right", padx=2, pady=6)
         self._due_wrap = due_wrap
@@ -1594,10 +1603,14 @@ class TaskWidget:
         row = tk.Frame(self.rows_box, bg=BG_ROW)
         row.pack(fill="x", padx=6, pady=2)
 
+        grip = self._grip(row, BG_ROW)
+        grip.pack(side="left", padx=(2, 0))
+        self._tooltip(grip, "Arrastrá para reordenar")
+
         box = tk.Label(row, text="✔" if task["done"] else "○", bg=BG_ROW,
                        fg=ACCENT if task["done"] else FG_DIM,
                        font=self.f_body, cursor="hand2", width=2)
-        box.pack(side="left", padx=(4, 2), pady=4)
+        box.pack(side="left", padx=(2, 2), pady=4)
         box.bind("<Button-1>", lambda e, i=idx: self.toggle_done(i))
 
         dot = tk.Label(row, text="●", bg=BG_ROW,
@@ -1626,20 +1639,38 @@ class TaskWidget:
 
         for w in (row, mid, txt):
             w.bind("<Button-3>", lambda e, i=idx, m=mid: self._context_menu(e, i, m))
+        for w in (row, grip):
             w.bind("<ButtonPress-1>", lambda e, r=row: self._rowdrag_start(e, r))
             w.bind("<B1-Motion>", self._rowdrag_motion)
             w.bind("<ButtonRelease-1>", self._rowdrag_end)
+        grip.bind("<Button-3>", lambda e, i=idx, m=mid: self._context_menu(e, i, m))
 
         dele = tk.Label(row, text="✕", bg=BG_ROW, fg=BG_ROW, font=self.f_small,
                         cursor="hand2", width=2)
         dele.pack(side="right", padx=4)
         dele.bind("<Button-1>", lambda e, i=idx: self.delete_task(i))
-        row.bind("<Enter>", lambda e, d=dele: d.config(fg=FG_DIM))
-        row.bind("<Leave>", lambda e, d=dele: d.config(fg=BG_ROW))
+        row.bind("<Enter>", lambda e, d=dele, g=grip: (d.config(fg=FG_DIM), g._paint(FG)))
+        row.bind("<Leave>", lambda e, d=dele, g=grip: (d.config(fg=BG_ROW), g._paint(FG_DIM)))
         dele.bind("<Enter>", lambda e, d=dele: d.config(fg=OVERDUE))
         return row
 
     # ------------------------------------------------------------------ orden / reordenar
+    def _grip(self, parent, bg):
+        """Manija de 6 puntitos para agarrar y arrastrar la fila."""
+        g = tk.Canvas(parent, width=12, height=24, bg=bg,
+                      highlightthickness=0, cursor="fleur")
+
+        def paint(color):
+            g.delete("all")
+            for cx in (4, 8):
+                for cy in (7, 12, 17):
+                    g.create_oval(cx - 1, cy - 1, cx + 1, cy + 1,
+                                  fill=color, outline=color)
+
+        g._paint = paint
+        paint(FG_DIM)
+        return g
+
     def _auto_order(self):
         """Índices de self.tasks en el orden automático: hechas al final,
         después por vencimiento y por prioridad."""
@@ -1712,6 +1743,175 @@ class TaskWidget:
         for fr in self._rows:
             fr.pack(fill="x", padx=6, pady=2)
 
+    # ------------------------------------------------------------------ calendario
+    def _cal_button(self, parent, bg, command):
+        """Iconito de calendario dibujado (sin dependencias)."""
+        c = tk.Canvas(parent, width=16, height=16, bg=bg, highlightthickness=0,
+                      cursor="hand2")
+
+        def draw(color):
+            c.delete("all")
+            c.create_rectangle(2, 3, 13, 13, outline=color)
+            c.create_line(2, 6, 13, 6, fill=color)
+            c.create_line(5, 2, 5, 4, fill=color)
+            c.create_line(10, 2, 10, 4, fill=color)
+            for gx in (4, 7, 10):
+                for gy in (8, 11):
+                    c.create_rectangle(gx, gy, gx + 1, gy + 1, outline=color)
+
+        draw(FG_DIM)
+        c.bind("<Enter>", lambda e: draw(ACCENT))
+        c.bind("<Leave>", lambda e: draw(FG_DIM))
+        c.bind("<Button-1>", lambda e: command())
+        return c
+
+    def _pick_due_for_new(self):
+        cur = "" if self._is_placeholder(self.e_due) else parse_due(self.e_due.get())
+
+        def done(iso):
+            self._clear_placeholder(self.e_due)
+            self.e_due.config(validate="none")
+            self.e_due.delete(0, "end")
+            if iso:
+                self.e_due.insert(0, iso)
+                self.e_due.config(fg=FG)
+                self.e_due._is_ph = False
+            else:
+                self._set_placeholder(self.e_due, "venc.")
+            self.e_due.config(validate="key")
+
+        self._open_calendar(self._due_wrap, cur, done)
+
+    def _pick_due_for_task(self, idx, near=None):
+        if idx >= len(self.tasks):
+            return
+
+        def done(iso):
+            self.tasks[idx]["due"] = iso
+            self._due_notified.discard(self.tasks[idx].get("id"))
+            self.render()
+
+        anchor = near
+        while anchor is not None and anchor not in self._rows:
+            anchor = getattr(anchor, "master", None)
+        self._open_calendar(anchor or self.add_bar, self.tasks[idx].get("due", ""), done)
+
+    def _open_calendar(self, anchor, initial_iso, on_pick):
+        """Mini calendario en un Toplevel sin marco, tema acorde."""
+        if getattr(self, "_cal", None):
+            try:
+                self._cal.destroy()
+            except tk.TclError:
+                pass
+        top = tk.Toplevel(self.root)
+        self._cal = top
+        top.overrideredirect(True)
+        top.transient(self.root)
+        top.attributes("-topmost", True)
+        top.configure(bg=BORDER)
+        outer = tk.Frame(top, bg=BG)
+        outer.pack(padx=1, pady=1)
+
+        today = date.today()
+        try:
+            sel = date.fromisoformat(initial_iso) if initial_iso else None
+        except ValueError:
+            sel = None
+        st = {"y": (sel or today).year, "m": (sel or today).month}
+
+        def close():
+            self._cal = None
+            try:
+                top.destroy()
+            except tk.TclError:
+                pass
+
+        def choose(d):
+            close()
+            on_pick(d.isoformat() if d else "")
+
+        def shift(delta):
+            m0 = st["m"] - 1 + delta
+            st["y"] += m0 // 12
+            st["m"] = m0 % 12 + 1
+            build()
+
+        def build():
+            for w in outer.winfo_children():
+                w.destroy()
+            hdr = tk.Frame(outer, bg=BG)
+            hdr.pack(fill="x", padx=8, pady=(7, 3))
+            for txt, dl in (("‹", -1), ("›", 1)):
+                b = tk.Label(hdr, text=txt, bg=BG, fg=FG_DIM, font=self.f_title,
+                             cursor="hand2", width=2)
+                b.pack(side="left" if dl < 0 else "right")
+                b.bind("<Button-1>", lambda e, d=dl: shift(d))
+                b.bind("<Enter>", lambda e, x=b: x.config(fg=ACCENT))
+                b.bind("<Leave>", lambda e, x=b: x.config(fg=FG_DIM))
+            tk.Label(hdr, text=f"{MESES_L[st['m'] - 1]} {st['y']}", bg=BG, fg=FG,
+                     font=self.f_title).pack(side="left", expand=True)
+
+            grid = tk.Frame(outer, bg=BG)
+            grid.pack(padx=8)
+            for i, d in enumerate(DIAS_MIN):
+                tk.Label(grid, text=d, width=3, bg=BG, fg=FG_DIM,
+                         font=self.f_small).grid(row=0, column=i, pady=(0, 2))
+            weeks = calendar.Calendar(firstweekday=0).monthdayscalendar(st["y"], st["m"])
+            for r, week in enumerate(weeks, start=1):
+                for c_, dnum in enumerate(week):
+                    if dnum == 0:
+                        continue
+                    d = date(st["y"], st["m"], dnum)
+                    is_sel = d == sel
+                    is_today = d == today
+                    fg = "#111" if is_sel else (ACCENT if is_today else FG)
+                    bg = ACCENT if is_sel else BG
+                    cell = tk.Label(grid, text=str(dnum), width=3, bg=bg, fg=fg,
+                                    font=self.f_small, cursor="hand2")
+                    cell.grid(row=r, column=c_, pady=1)
+                    cell.bind("<Button-1>", lambda e, dd=d: choose(dd))
+                    if not is_sel:
+                        cell.bind("<Enter>", lambda e, x=cell: x.config(bg=BG_ROW_HI))
+                        cell.bind("<Leave>", lambda e, x=cell: x.config(bg=BG))
+
+            ft = tk.Frame(outer, bg=BG)
+            ft.pack(fill="x", padx=8, pady=(4, 7))
+            tk.Label(ft, text="Hoy", bg=BG, fg=ACCENT, font=self.f_small,
+                     cursor="hand2").pack(side="left")
+            ft.winfo_children()[0].bind("<Button-1>", lambda e: choose(today))
+            clr = tk.Label(ft, text="Borrar", bg=BG, fg=FG_DIM, font=self.f_small,
+                           cursor="hand2")
+            clr.pack(side="right")
+            clr.bind("<Button-1>", lambda e: choose(None))
+
+        build()
+        top.update_idletasks()
+        ax, ay = anchor.winfo_rootx(), anchor.winfo_rooty()
+        w, h = top.winfo_width(), top.winfo_height()
+        sw, sh = self.root.winfo_screenwidth(), self.root.winfo_screenheight()
+        x = max(4, min(ax, sw - w - 6))
+        y = ay + anchor.winfo_height() + 3
+        if y + h > sh - 4:
+            y = max(4, ay - h - 3)
+        top.geometry(f"+{x}+{y}")
+        top.bind("<Escape>", lambda e: close())
+        top.bind("<FocusOut>", lambda e: top.after(120, self._cal_autoclose))
+        top.focus_force()
+
+    def _cal_autoclose(self):
+        top = getattr(self, "_cal", None)
+        if not top:
+            return
+        try:
+            f = top.focus_displayof()
+            inside = f is not None and (str(f) == str(top) or
+                                        str(f).startswith(str(top) + "."))
+            if not inside:
+                top.destroy()
+                self._cal = None
+        except tk.TclError:
+            pass
+
     # ------------------------------------------------------------------ edición inline
     def _edit_inline(self, idx, mid, field):
         self._editing = True
@@ -1761,7 +1961,9 @@ class TaskWidget:
         m = tk.Menu(self.root, tearoff=0, bg=BG_HEADER, fg=FG,
                     activebackground=ACCENT, activeforeground="#fff", relief="flat")
         m.add_command(label="Editar texto", command=lambda: self._edit_inline(idx, mid, "text"))
-        m.add_command(label="Cambiar fecha", command=lambda: self._edit_inline(idx, mid, "due"))
+        m.add_command(label="Cambiar fecha (texto)", command=lambda: self._edit_inline(idx, mid, "due"))
+        m.add_command(label="Fecha en calendario…",
+                      command=lambda: self._pick_due_for_task(idx, mid))
         prio = tk.Menu(m, tearoff=0, bg=BG_HEADER, fg=FG,
                        activebackground=ACCENT, activeforeground="#fff")
         for p in ("alta", "media", "baja"):

@@ -74,7 +74,8 @@ administrador y se puede desmarcar en cualquier momento.
 | Editar texto | Doble clic en el texto de la tarea |
 | Editar / poner fecha | Clic en la fecha de la tarea (o `＋ fecha`) |
 | Menú completo de una tarea | Clic derecho sobre la tarea |
-| Reordenar | Arrastrar una fila de arriba a abajo (pasa a "orden manual"; enlace al pie para volver al automático) |
+| Reordenar | Arrastrar desde la manija (⣿) de la izquierda de la fila (pasa a "orden manual"; enlace al pie para volver al automático) |
+| Elegir fecha con calendario | Iconito de calendario al lado de "venc." (o clic derecho en la tarea → "Fecha en calendario…") |
 | Borrar | Clic en la `✕` que aparece al pasar el mouse por la fila (`Ctrl+Z` / "Deshacer" para recuperar) |
 | Limpiar completadas | Enlace "Limpiar N completadas" al pie de la lista |
 | Opciones (tema, iniciar con Windows, opacidad) | Botón `⚙` o clic derecho en la barra de título |
@@ -176,9 +177,12 @@ icono de bandeja.
   AppUserModelID propio en HKCU, así el aviso **queda guardado** en el Centro de
   notificaciones (`Win + N`) con nombre e icono propios — el globo clásico de la
   bandeja se borraba a los pocos segundos. (#10)
-- **Reordenar tareas arrastrando**: arrastrar una fila cambia el orden y activa el
-  "orden manual" (se guarda en `tasks.json`). Toggle en Opciones y enlace al pie
-  de la lista para volver al orden automático. (#11)
+- **Reordenar tareas arrastrando**: cada fila tiene una **manija** (⣿) a la
+  izquierda; al arrastrarla cambia el orden y activa el "orden manual" (se guarda
+  en `tasks.json`). Toggle en Opciones y enlace al pie para volver al automático. (#11)
+- **Mini calendario para el vencimiento**: iconito de calendario al lado de "venc."
+  y opción "Fecha en calendario…" en el menú de cada tarea. Dibujado con tkinter
+  (sin dependencias): mes navegable, "Hoy" y "Borrar". (#14)
 
 **Arreglos**
 
