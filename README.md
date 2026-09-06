@@ -1,322 +1,118 @@
-# TaskTracker Widget
+# TaskTracker
 
-Un tracker de tareas que vive en el escritorio de Windows. Python + tkinter,
-**sin dependencias externas** (tkinter viene con el instalador de Python).
-
-- Ventana sin bordes, semitransparente y arrastrable.
-- **Vive pegado al escritorio**: aparece detrás de las ventanas normales. Al
-  hacerle clic sube al frente; al hacer clic afuera vuelve a bajar.
-- Colapsado queda como una barrita siempre visible, así nunca se pierde.
-- Atajo global (**`Ctrl+Alt+T`** por defecto, configurable) para traerlo al frente.
-- Tareas con fecha de vencimiento y prioridad, contador por prioridad, ventana
-  redimensionable.
-- **Tema claro / oscuro / automático**, con estética translúcida tipo *glass*
-  (blur acrylic de Windows por detrás en el tema oscuro).
-- **Icono en la bandeja del sistema**: clic izquierdo lo muestra/trae al frente,
-  clic derecho abre el menú (mostrar/ocultar · opciones · salir). El icono cambia
-  claro/oscuro según el tema del widget, y el tooltip muestra los pendientes.
-- Todo se guarda en `tasks.json`, al lado del script.
+Un widget de tareas para el escritorio de Windows. Liviano, sin instalación y
+**sin dependencias** — es un solo archivo de Python (tkinter).
 
 ---
 
-## Descargar (sin instalar nada)
+## Qué hace
 
-Bajá **`TaskWidget.exe`** de la [página de Releases](../../releases/latest) y hacé
-doble clic. No necesita Python ni instalación. El archivo `tasks.json` se crea al
-lado del `.exe` en el primer arranque.
+- **Vive en el escritorio.** Aparece *detrás* de las ventanas normales, como un
+  widget de verdad: le hacés clic y sube, hacés clic afuera y vuelve a bajar.
+  No te tapa lo que estás haciendo.
+- **Siempre a mano.** Atajo global (`Ctrl+Alt+T`, configurable) para traerlo al
+  frente desde cualquier lado. Colapsalo a una barrita y queda fija arriba de todo.
+- **Tareas con lo justo.** Prioridad (alta / media / baja), fecha de vencimiento
+  con mini calendario, marcar como hecha, editar en el lugar, reordenar
+  arrastrando. Contador de pendientes por prioridad en la barra.
+- **Te avisa.** Cuando una tarea vence o está atrasada salta un toast de Windows
+  que **queda guardado** en el Centro de notificaciones (`Win + N`).
+- **Se adapta.** Tema claro / oscuro / automático (sigue el de Windows), con una
+  estética translúcida tipo *glass*. Ventana redimensionable y con opacidad
+  ajustable.
+- **En la bandeja del sistema.** Clic izquierdo lo muestra, clic derecho abre el
+  menú. La ✕ lo manda a la bandeja en vez de cerrarlo (configurable, como Discord).
+- **Arranca con Windows** si querés — un toggle, sin permisos de administrador.
+- Todo se guarda solo en `tasks.json`, al lado del programa.
 
-> Windows Defender / SmartScreen puede avisar que es de un "editor desconocido"
-> (pasa con todo `.exe` sin firma digital): *Más información → Ejecutar de todas formas*.
-> Algunos antivirus dan falso positivo con ejecutables de PyInstaller.
+## Descargar
 
-El `.exe` lo compila solo GitHub Actions en cada release — ver
-[Build / CI](#build--ci) más abajo.
+Bajá **`TaskWidget.exe`** de la [última Release](../../releases/latest) y hacé
+doble clic. No necesita Python ni instalación; `tasks.json` se crea solo al lado
+del `.exe` en el primer arranque.
 
-## Requisitos (para correrlo desde el código)
+> SmartScreen puede avisar "editor desconocido" (pasa con todo `.exe` sin firma
+> digital): *Más información → Ejecutar de todas formas*. Algunos antivirus dan
+> falso positivo con ejecutables de PyInstaller.
 
-- Windows 10 / 11
-- Python 3.8 o superior ([python.org](https://www.python.org/downloads/) — marcar
-  *"Add Python to PATH"* en el instalador).
+## Controles
 
-El atajo global y el comportamiento "pegado al escritorio" usan la API de Windows
-(`ctypes`); en otros sistemas operativos la app arranca igual pero sin esas dos features.
+| Acción | Cómo |
+|---|---|
+| Agregar tarea | Escribir abajo → Enter (o el `+`) |
+| Prioridad de la nueva tarea | Clic en el `●` de la izquierda (baja → media → alta) |
+| Fecha de vencimiento | Campo "venc." (`11/09`, `2026-09-11`, `11/09/2026`) o el iconito de calendario |
+| Marcar hecha | Clic en el `○` de la fila |
+| Editar texto / fecha | Doble clic en el texto; clic en la fecha (o `＋ fecha`) |
+| Cambiar prioridad | Clic en el `●` de la fila |
+| Reordenar | Pasar el mouse por la fila y arrastrar desde la manija de la izquierda |
+| Borrar | Pasar el mouse por la fila → tacho de la derecha (`Ctrl+Z` para deshacer) |
+| Limpiar completadas | Enlace al pie de la lista |
+| Menú de una tarea | Clic derecho sobre ella |
+| Mover la ventana | Arrastrar desde la barra "Tareas" |
+| Redimensionar | Arrastrar la franja fina de abajo |
+| Colapsar / expandir | Botón `–`, doble clic en el título, o el atajo global |
+| Traer al frente | Atajo global (`Ctrl+Alt+T` por defecto) |
+| Minimizar a la bandeja | Botón `✕` |
+| Opciones | Botón `⚙` o clic derecho en la barra |
+| Bandeja del sistema | Clic izq. = mostrar · clic der. = menú |
 
-## Uso
+## Opciones (botón `⚙` o clic derecho en la barra)
+
+- **Tema**: claro / oscuro / automático.
+- **Mantener siempre visible**: el widget sube por encima de las demás ventanas.
+- **Orden manual**: reordenás arrastrando; si está apagado, la lista se ordena
+  sola (pendientes arriba, después por fecha más cercana y prioridad; atrasadas
+  en rojo).
+- **Iniciar con Windows**.
+- **Al cerrar, minimizar a la bandeja**.
+- **Avisar cuando una tarea vence**.
+- **Atajo global**: "Cambiar…" y presionás la combinación que quieras.
+- **Opacidad cuando no está en foco**: un slider.
+
+## Notas
+
+- El "vivir pegado al escritorio", el atajo global y los toasts usan API de
+  Windows. En otros sistemas la app abre igual, pero sin esas tres features.
+- El blur *acrylic* sólo se usa en el tema oscuro (en claro se lava sobre fondos
+  claros). Si da problemas, arrancá con `TW_NOACRYLIC=1`. Las esquinas quedan
+  rectas: Windows no redondea las ventanas sin marco.
+- Cambios guardados en cada acción + autosave cada 30 s. Recuerda posición,
+  tamaño y estado de la ventana.
+
+## Correrlo desde el código
+
+Requisitos: **Windows 10 / 11** y **Python 3.8+**
+([python.org](https://www.python.org/downloads/), marcando *"Add Python to PATH"*).
+tkinter viene incluido.
 
 ```bash
 pythonw task_widget.py
 ```
 
-`pythonw` no deja una consola abierta. Usá `python task_widget.py` si querés ver
-mensajes de error por consola (el aviso de "atajo en uso" también sale en la UI).
+`pythonw` no deja una consola abierta; usá `python task_widget.py` para ver los
+mensajes por consola.
 
-### Para que arranque con Windows
+## Desarrollo
 
-Botón **`⚙`** en la barra (o clic derecho en la barra) → **"Iniciar con Windows"**.
-Escribe una entrada en `HKCU\...\CurrentVersion\Run` apuntando al `.exe` (o a
-`pythonw task_widget.py` si lo corrés desde el código). No necesita permisos de
-administrador y se puede desmarcar en cualquier momento.
-
-### Controles
-
-| Acción | Cómo |
-|---|---|
-| Mover la ventana | Arrastrar desde la barra "Tareas" |
-| Redimensionar | Arrastrar la franja fina de abajo |
-| Colapsar / expandir | Botón `–`, doble clic en el título, o el atajo global |
-| Traer al frente | Atajo global (`Ctrl+Alt+T` por defecto; se cambia en Opciones) |
-| Minimizar a la bandeja | Botón `✕` (o "Salir" en el tray para cerrar de verdad) |
-| Agregar tarea | Escribir abajo → Enter (o el `+`) |
-| Prioridad de la nueva tarea | Clic en el `●` de la izquierda (baja → media → alta) |
-| Fecha de vencimiento | Campo "venc." — acepta `11/09`, `2026-09-11`, `11/09/2026` |
-| Marcar hecha | Clic en el `○` de la fila |
-| Cambiar prioridad de una tarea | Clic en el `●` de la fila |
-| Editar texto | Doble clic en el texto de la tarea |
-| Editar / poner fecha | Clic en la fecha de la tarea (o `＋ fecha`) |
-| Menú completo de una tarea | Clic derecho sobre la tarea |
-| Reordenar | Pasar el mouse por la fila y arrastrar desde la manija de puntos de la izquierda (pasa a "orden manual"; enlace al pie para volver al automático) |
-| Elegir fecha con calendario | Iconito de calendario al lado de "venc." (o clic derecho en la tarea → "Fecha en calendario…") |
-| Borrar | Pasar el mouse por la fila y clic en el tacho de la derecha (`Ctrl+Z` / "Deshacer" para recuperar) |
-| Limpiar completadas | Enlace "Limpiar N completadas" al pie de la lista |
-| Cambiar el atajo global | Opciones → "Atajo global" → "Cambiar…" y presionás la combinación |
-| Opciones (tema, atajo, iniciar con Windows, opacidad) | Botón `⚙` o clic derecho en la barra de título |
-| Mostrar / ocultar · salir | Icono de la bandeja del sistema (clic izq. muestra, clic der. abre el menú) |
-
-### Estética "glass" — límites
-
-tkinter no tiene blur nativo. El efecto se arma con transparencia de ventana +
-el *blur acrylic* de Windows (`SetWindowCompositionAttribute`) por detrás. Notas:
-
-- El acrylic sólo se usa en el **tema oscuro**; en claro se lava sobre fondos
-  claros, así que el tema claro es sólo translúcido.
-- Las esquinas quedan rectas: Windows no redondea ventanas sin marco.
-- Si el blur da problemas (parpadeos, lentitud), arrancá con la variable de
-  entorno `TW_NOACRYLIC=1` para desactivarlo y dejar sólo la translucidez.
-
-Las tareas se ordenan solas: pendientes arriba, después por fecha más cercana y
-prioridad. Las atrasadas quedan en rojo. Si arrastrás una fila para reordenar, el
-orden pasa a ser **manual** (se guarda tal cual); hay un enlace al pie y un toggle
-en Opciones para volver al automático. Se guarda en cada cambio y hay autosave
-cada 30 s; recuerda posición, tamaño y estado de la ventana.
-
-## Archivos
-
-| Archivo | Qué es |
-|---|---|
-| `task_widget.py` | La aplicación. Un solo archivo. |
-| `tasks.json` | Tus tareas + geometría de la ventana. Local, **fuera del repo** (`.gitignore`). La app lo crea en el primer arranque. |
-| `README.md` | Este archivo. |
-| `.github/workflows/build.yml` | CI: compila el `.exe` en cada push y publica el Release en los tags. |
-
----
-
-## Build / CI
-
-GitHub Actions (`.github/workflows/build.yml`) compila el ejecutable con
-**PyInstaller** en un runner de Windows.
-
-- **En cada push / PR a `main`**: compila y sube `TaskWidget.exe` como *artifact*
-  de la corrida (pestaña **Actions** del repo → la corrida → *Artifacts*).
-  Sirve para probar; el artifact se borra a los 90 días.
-- **En un tag `vX.Y.Z`**: además crea un **Release** con el `.exe` adjunto y notas
-  autogeneradas. Eso es lo que baja la gente.
-
-### Sacar una versión nueva
-
-```bash
-# 1. actualizá el Changelog del README y commiteá
-git add README.md task_widget.py
-git commit -m "release v4"
-
-# 2. tag + push  →  Actions compila y publica el Release solo
-git tag v4.0.0
-git push --tags
-```
-
-Compilar a mano localmente (si querés probar el `.exe` sin esperar a Actions):
-
-```bash
-pip install pyinstaller
-pyinstaller --onefile --windowed --name TaskWidget --icon assets/icon.ico task_widget.py
-# queda en dist/TaskWidget.exe
-```
-
-### Icono
-
-`assets/icon.ico` (multi-tamaño 16→256) sale de `assets/icon-light.svg`. Para
-regenerarlo hay que rasterizar el SVG a PNG y armar el `.ico` con Pillow
-(los tamaños chicos usan `assets/icon-light-small.svg`, sin las marcas del reloj).
-`assets/icon-dark.svg` es la variante para fondos claros / uso a futuro en un
-icono de bandeja.
-
-Los iconos de fila (manija, tacho, calendario) están en `assets/grip.svg`,
-`assets/trash.svg` y `assets/calendar.svg` (Lucide). Se rasterizan con
-anti-alias a PNG y se embeben en `_ICON_B64`; para regenerarlos:
-`python assets/gen_row_icons.py` y pegar la salida.
-
----
+- **Un solo archivo**: [`task_widget.py`](task_widget.py).
+- **CI** (`.github/workflows/build.yml`): compila `TaskWidget.exe` con PyInstaller
+  en cada push a `main` (queda como *artifact* de la corrida) y publica un
+  **Release** con el `.exe` al pushear un tag `vX.Y.Z`.
+- **Sacar una versión**: actualizar [`CHANGELOG.md`](CHANGELOG.md), commitear,
+  `git tag vX.Y.Z && git push --tags`.
+- **Compilar local**:
+  ```bash
+  pip install pyinstaller
+  pyinstaller --onefile --windowed --name TaskWidget --icon assets/icon.ico task_widget.py
+  ```
+- **Iconos**: fuentes SVG en `assets/`. El de la app (`icon.ico`) se arma con
+  Pillow desde `assets/icon-light.svg`; los de fila (`grip` / `trash` / `calendar`)
+  con `python assets/gen_row_icons.py`.
 
 ## Changelog
 
-### Sin publicar
-
-**Nuevo**
-
-- **Icono en la bandeja del sistema** (`Shell_NotifyIcon` vía `ctypes`, sin
-  dependencias). Clic izq. muestra/trae al frente el widget; clic der. abre un
-  menú (mostrar/ocultar · opciones · salir). El icono cambia claro/oscuro con el
-  tema del widget (y cuando cambia el de Windows, si el tema está en "auto"); el
-  tooltip muestra los pendientes. (#18)
-- **Icono propio del `.exe`** (`assets/icon.ico`, de `assets/icon-light.svg`),
-  enchufado al build local y a Actions. (#17)
-- La app se presenta ante Windows como **TaskTracker** (título, Alt+Tab, tray);
-  el encabezado del widget sigue diciendo **Tareas**. (#19)
-- La ventana de **Opciones** usa el icono de la app según el tema (antes: la
-  pluma de Tk). (#20)
-- La **✕** minimiza a la bandeja en vez de cerrar (como Discord); toggle en
-  Opciones ("Al cerrar, minimizar a la bandeja"), y "Salir" del tray cierra de
-  verdad. La primera vez avisa con un globo. (#5)
-- **Aviso cuando una tarea vence**: cada 30 min revisa las tareas atrasadas o que
-  vencen hoy y lo notifica con un toast de Windows (una vez por día por tarea).
-  Toggle en Opciones ("Avisar cuando una tarea vence"). El toast se arma vía
-  `Windows.UI.Notifications` (PowerShell, sin dependencias) y la app registra un
-  AppUserModelID propio en HKCU, así el aviso **queda guardado** en el Centro de
-  notificaciones (`Win + N`) con nombre e icono propios — el globo clásico de la
-  bandeja se borraba a los pocos segundos. (#10)
-- **Reordenar tareas arrastrando**: al pasar el mouse por una fila aparece una
-  **manija** de puntos a la izquierda; se arrastra desde ahí para cambiar el
-  orden, que pasa a "manual" (se guarda en `tasks.json`). Toggle en Opciones y
-  enlace al pie para volver al automático. (#11)
-- **Mini calendario para el vencimiento**: iconito de calendario al lado de "venc."
-  y opción "Fecha en calendario…" en el menú de cada tarea. Dibujado con tkinter
-  (sin dependencias): mes navegable, "Hoy" y "Borrar". (#14)
-- Los iconos de fila (manija, tacho, calendario) son PNG con anti-alias generados
-  desde SVG (`assets/*.svg` + `assets/gen_row_icons.py`), no dibujos a mano en
-  Canvas. La manija y el tacho sólo se ven al pasar el mouse por la fila.
-- **Atajo global configurable**: en Opciones se captura la combinación y se guarda
-  en `tasks.json`. Si el atajo está ocupado por otro programa, ahora se avisa en
-  la propia UI (enlace al pie + estado en Opciones), no sólo por consola. (#16)
-
-**Arreglos**
-
-- Tooltips legibles en tema claro (antes: fondo negro + texto negro). (#1)
-- Se elimina la fuga de objetos `Font` al renderizar tareas completadas. (#3)
-- La edición inline ya no puede dejar el widget "pegado" al frente si no se
-  confirma. (#4)
-- El campo "venc." ya no queda con el placeholder pegado al texto al agregar
-  una tarea con Enter desde ese campo. (#6)
-- La rueda del mouse sólo scrollea la lista si el puntero está sobre ella
-  (antes: `bind_all` global). (#7)
-- El atajo global se desregistra desde su propio hilo al cerrar. (#8)
-- **Instancia única**: si ya hay una corriendo, abrir el `.exe` de nuevo trae la
-  ventana existente al frente y no arranca una segunda (antes: dos instancias se
-  pisaban el `tasks.json`). Mutex con nombre + mensaje a la ventana del tray. (#2)
-- Colapsado, el título muestra los **pendientes** (`Tareas · 3`). (#12)
-- Enlace **"Limpiar N completadas"** al pie de la lista. (#13)
-- **Deshacer** al borrar una tarea: enlace al pie por unos segundos, o `Ctrl+Z`. (#21)
-- Opción **"Mantener siempre visible"** en Opciones — el widget queda sobre las
-  demás ventanas en vez de a nivel escritorio. (#15)
-
-### v4 — 2026-09-05
-
-**Nuevo**
-
-- **Tema claro / oscuro / automático** (sigue el de Windows), en el menú `⚙`.
-  Estética translúcida tipo *glass*; en oscuro además usa el blur acrylic de
-  Windows por detrás. Variable `TW_NOACRYLIC=1` para desactivar el blur.
-- Opción **"Iniciar con Windows"** en el menú `⚙` / clic derecho en la barra.
-  Usa la clave `Run` del usuario actual (sin permisos de admin); al arrancar
-  re-escribe la ruta por si moviste el archivo.
-- **CI en GitHub Actions**: compila `TaskWidget.exe` con PyInstaller en cada push
-  y publica un Release con el `.exe` al pushear un tag `vX.Y.Z`.
-- `tasks.json` se lee tolerando BOM (por si lo editás con un editor que lo agrega).
-
-**Arreglos**
-
-- La ventana **ya no se puede arrastrar fuera de la pantalla**. Durante el arrastre
-  siempre queda una parte visible; al soltar se acomoda entera dentro del monitor.
-  Funciona con varios monitores (se puede mover entre ellos) y recupera la ventana
-  al arrancar si había quedado en un monitor que ya no está.
-- El botón **`+`** ya no se recorta al achicar la ventana: ahora se comprime solo
-  el campo de texto y los botones fijos conservan su tamaño.
-- **Con foco** el widget es un panel casi opaco (para trabajar); **sin foco** se
-  vuelve translúcido con el blur del escritorio detrás, y se funde con el fondo.
-
-**Estética**
-
-- **Nueva paleta**: oscuro = negro + amarillo; claro = blanco + azul/celeste.
-- **Inputs con esquinas redondeadas**, igual que la ventana.
-- **Panel de Opciones** (botón `⚙` o clic derecho en la barra): tema, iniciar con
-  Windows y un **slider de opacidad** para el estado sin foco.
-- Se quitó el icono de *grip*: la franja de abajo sigue redimensionando la ventana,
-  sin icono.
-- En el primer arranque aparece en la **esquina superior derecha** (con un margen
-  al borde); después recuerda dónde lo dejaste.
-- Iconos (`x`, `–`, engranaje, `+`) tomados de **[Lucide](https://lucide.dev)**
-  (licencia ISC), rasterizados a PNG y embebidos — nítidos y con variante por tema.
-
-### v3 — 2026-09-04
-
-**Arreglos**
-
-- El atajo global **Ctrl+Alt+T** ahora funciona. No andaba porque las llamadas a la
-  API de Windows se hacían sin `argtypes`: en Windows de 64 bits los handles se
-  truncaban a 32 bits y `RegisterHotKey` fallaba en silencio. Además el hilo del
-  atajo ya no toca tkinter directamente (no es thread-safe): prende un flag que el
-  hilo principal revisa cada 150 ms.
-- La **fecha de una tarea ya se puede editar**. Se sacó el pop-up (fallaba por
-  problemas de foco al ser la ventana principal `overrideredirect`). Ahora se edita
-  inline, igual que el texto.
-
-**Nuevo**
-
-- Colapsado, la barrita pasa a **always-on-top**, así nunca queda tapada y siempre
-  se puede reabrir (doble clic en el título o botón `–`), aunque el atajo falle.
-  Al expandir vuelve al nivel escritorio.
-- **Contador por prioridad** en la barra de título: `●2 ●1 ●0` (alta / media / baja),
-  cuenta solo las pendientes.
-- **Ventana redimensionable**: arrastrando la franja fina de abajo. El tamaño (`w`, `h`) se
-  guarda en `tasks.json`. La lista scrollea sola y el texto re-ajusta el ancho.
-- Editar la fecha: doble clic (o un clic) sobre la fecha de la tarea; si no tiene,
-  muestra `＋ fecha`.
-
-### v2 — 2026-09-04
-
-**Cambio de modelo de ventana**
-
-- El widget deja de estar "siempre encima" y pasa a **vivir pegado al escritorio**:
-  aparece detrás de las ventanas normales (nivel escritorio, vía `SetWindowPos` +
-  `HWND_BOTTOM`). Al hacerle clic sube; al hacer clic afuera vuelve a bajar.
-- `WS_EX_TOOLWINDOW`: no aparece en la barra de tareas ni en Alt+Tab.
-
-**Nuevo**
-
-- **Atajo global Ctrl+Alt+T** para traerlo al frente / expandirlo (registrado con
-  `RegisterHotKey` en un hilo aparte). — *(nota: recién quedó funcionando bien en v3)*
-- Edición del **texto** de una tarea: doble clic → input inline (Enter guarda, Esc cancela).
-- **Menú contextual** (clic derecho) en cada tarea: editar texto, cambiar fecha,
-  prioridad, marcar hecha/pendiente, eliminar.
-- El campo de fecha **limita lo que se puede tipear**: solo dígitos, `/` y `-`,
-  máximo 10 caracteres.
-- Colapsar/expandir separado en `_collapse()` / `_expand()`; el expand re-renderiza.
-
-### v1 — 2026-09-03
-
-Primera versión.
-
-- Ventana sin bordes, siempre visible, semitransparente (`-alpha 0.94`) y **arrastrable**
-  desde la barra de título.
-- **Alta / baja de tareas**, marcar como hecha (tachado), eliminar (aparece la `✕` al
-  pasar el mouse por la fila).
-- **Fecha de vencimiento** opcional. Acepta `DD/MM`, `YYYY-MM-DD`, `DD/MM/YYYY`.
-  Etiqueta con días restantes; en rojo si está atrasada o vence hoy.
-- **Prioridad** Alta / Media / Baja (punto de color, clic para ciclar).
-- Orden automático: pendientes primero, después por fecha más cercana y prioridad.
-- **Persistencia** en `tasks.json` (guardado en cada cambio + autosave cada 30 s).
-  Recuerda la posición de la ventana y si está colapsada.
-- Botón `–` para colapsar a solo la barra de título; `✕` para cerrar.
-
----
+Ver [CHANGELOG.md](CHANGELOG.md).
 
 ## Créditos
 

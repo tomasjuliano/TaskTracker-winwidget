@@ -49,8 +49,18 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/v')
         env:
           GH_TOKEN: ${{ github.token }}
-        run: >
-          gh release create "${{ github.ref_name }}"
-          "dist/TaskWidget.exe"
-          --title "${{ github.ref_name }}"
-          --generate-notes
+        run: |
+          $tag = "${{ github.ref_name }}"
+          $ghArgs = @("dist/TaskWidget.exe", "--title", $tag, "--generate-notes")
+          if (Test-Path CHANGELOG.md) {
+            $lines = Get-Content CHANGELOG.md
+            $hdr = $lines | Select-String "^## $([regex]::Escape($tag))\b" | Select-Object -First 1
+            if ($hdr) {
+              $rest = $lines[$hdr.LineNumber..($lines.Count - 1)]
+              $next = $rest | Select-String "^## " | Select-Object -First 1
+              $body = if ($next) { $rest[0..($next.LineNumber - 2)] } else { $rest }
+              $notes = ($body -join "`n").Trim()
+              if ($notes) { $ghArgs += @("--notes", $notes) }   # se antepone a las notas autogeneradas
+            }
+          }
+          gh release create $tag @ghArgs
