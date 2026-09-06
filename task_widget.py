@@ -7,7 +7,7 @@ Task Widget - un tracker de tareas para el escritorio de Windows.
   se puede volver a abrir con doble clic en el título o el botón "–".
 - Atajo global  Ctrl + Alt + T  para traerlo al frente desde cualquier lado.
 - Icono en la bandeja del sistema: clic izq = mostrar/traer al frente; clic der =
-  menú (mostrar/ocultar, opciones, salir). El icono sigue el tema de Windows.
+  menú (mostrar/ocultar, opciones, salir). El icono acompaña el tema del widget.
 - Ventana redimensionable (arrastrar la franja fina de abajo).
 - Editar: doble clic en el texto o en la fecha de una tarea; clic derecho = menú.
 - Botón "⚙" (o clic derecho en la barra): tema, iniciar con Windows, opacidad.
@@ -357,7 +357,7 @@ class Tray:
         self.queue = queue.Queue()
         self._hwnd = None
         self._tip = "Tareas"
-        self._sys_dark = True
+        self._dark = True
         self._icons = {}
         self._nid = None
         self._proc = None            # ref viva del callback (si no, lo barre el GC)
@@ -365,9 +365,9 @@ class Tray:
         threading.Thread(target=self._run, daemon=True).start()
 
     # -- API desde el hilo principal --
-    def update(self, tip, sys_dark):
+    def update(self, tip, dark):
         self._tip = (tip or "Tareas")[:127]
-        self._sys_dark = bool(sys_dark)
+        self._dark = bool(dark)
         if self._hwnd:
             u32.PostMessageW(self._hwnd, WM_TRAY_SYNC, 0, 0)
 
@@ -377,7 +377,7 @@ class Tray:
 
     # -- interno (hilo del tray) --
     def _icon(self):
-        want = "light" if self._sys_dark else "dark"   # contraste contra la barra
+        want = "dark" if self._dark else "light"        # el icono acompaña al tema del widget
         h = self._icons.get(want)
         if not h:
             path = _tray_ico_file(want)
@@ -1025,7 +1025,7 @@ class TaskWidget:
             return
         pend = sum(1 for t in self.tasks if not t.get("done"))
         tip = "Tareas" if not pend else f"Tareas — {pend} pendiente{'s' if pend != 1 else ''}"
-        self.tray.update(tip, system_theme() == "dark")
+        self.tray.update(tip, CUR_THEME == "dark")   # el icono acompaña al tema del widget
 
     # ------------------------------------------------------------------ UI
     def _build_header(self):
