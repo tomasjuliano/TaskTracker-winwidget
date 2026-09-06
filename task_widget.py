@@ -634,7 +634,7 @@ DEFAULT_STATE = {
     "window": {"x": None, "y": None, "w": 310, "h": 340, "collapsed": False,
                "sized": False, "theme": "auto", "dim_opacity": None,
                "close_to_tray": True, "tray_hint_shown": False,
-               "always_on_top": False, "due_alerts": True},
+               "always_on_top": False, "due_alerts": True, "manual_order": False},
     "tasks": [],
 }
 
@@ -1146,6 +1146,8 @@ class TaskWidget:
         self.win = self.state["window"]
         self.tasks = self.state["tasks"]
         self._drag = (0, 0)
+        self._rows = []               # frames de fila en orden visual
+        self._rowdrag = None          # arrastre de una fila para reordenar
         self._rs = None
         self._rs_target = None
         self._rs_pending = None
@@ -1407,6 +1409,9 @@ class TaskWidget:
         self._pin_var = tk.BooleanVar(value=self._pinned())
         chk("Mantener siempre visible (sobre las demás ventanas)", self._pin_var,
             self._toggle_pinned, (10, 0))
+        self._order_var = tk.BooleanVar(value=self.win.get("manual_order", False))
+        chk("Orden manual (arrastrá las filas para reordenar)", self._order_var,
+            self._toggle_manual_order, (2, 0))
         if IS_WIN:
             chk("Iniciar con Windows", self._autostart_var, self._toggle_autostart, (2, 0))
             self._tray_var = tk.BooleanVar(value=self.win.get("close_to_tray", True))
@@ -1455,6 +1460,14 @@ class TaskWidget:
         if self.win["due_alerts"]:
             self._due_notified.clear()      # re-evaluar todo y avisar ahora
             self._scan_due()
+
+    def _toggle_manual_order(self):
+        if self._order_var.get():
+            self._freeze_order()            # congela el orden visible actual
+        else:
+            self.win["manual_order"] = False
+        self.save()
+        self.render()
 
     def _build_body(self):
         self.body = tk.Frame(self.root, bg=BG)
@@ -1529,21 +1542,18 @@ class TaskWidget:
             w.destroy()
 
         wrap = max(140, self.win["w"] - 108)
-        order = sorted(
-            range(len(self.tasks)),
-            key=lambda i: (
-                self.tasks[i]["done"],
-                self.tasks[i].get("due") or "9999-99-99",
-                PRIO_RANK.get(self.tasks[i].get("priority", "media"), 1),
-            ),
-        )
+        manual = self.win.get("manual_order", False)
+        order = list(range(len(self.tasks))) if manual else self._auto_order()
 
+        self._rows = []              # frames en orden visual (para el drag de reorden)
+        self.rows_box = tk.Frame(self.list_frame, bg=BG)
+        self.rows_box.pack(fill="x")
         if not self.tasks:
-            tk.Label(self.list_frame, text="Sin tareas. Agregá una abajo 👇",
+            tk.Label(self.rows_box, text="Sin tareas. Agregá una abajo 👇",
                      bg=BG, fg=FG_DIM, font=self.f_body).pack(pady=18)
         else:
             for idx in order:
-                self._row(idx, self.tasks[idx], wrap)
+                self._rows.append(self._row(idx, self.tasks[idx], wrap))
 
         done_n = sum(1 for t in self.tasks if t.get("done"))
         if self._undo:
@@ -1551,6 +1561,8 @@ class TaskWidget:
         elif done_n:
             self._footer_action(f"Limpiar {done_n} completada{'s' if done_n != 1 else ''}",
                                 self._clear_done)
+        if manual and len(self.tasks) > 1:
+            self._footer_action("Orden manual  ·  volver al automático", self._auto_sort)
 
         counts = {"alta": 0, "media": 0, "baja": 0}
         pend = 0
@@ -1579,7 +1591,7 @@ class TaskWidget:
         lbl.bind("<Leave>", lambda e: lbl.config(fg=FG_DIM))
 
     def _row(self, idx, task, wrap):
-        row = tk.Frame(self.list_frame, bg=BG_ROW)
+        row = tk.Frame(self.rows_box, bg=BG_ROW)
         row.pack(fill="x", padx=6, pady=2)
 
         box = tk.Label(row, text="✔" if task["done"] else "○", bg=BG_ROW,
@@ -1614,6 +1626,9 @@ class TaskWidget:
 
         for w in (row, mid, txt):
             w.bind("<Button-3>", lambda e, i=idx, m=mid: self._context_menu(e, i, m))
+            w.bind("<ButtonPress-1>", lambda e, r=row: self._rowdrag_start(e, r))
+            w.bind("<B1-Motion>", self._rowdrag_motion)
+            w.bind("<ButtonRelease-1>", self._rowdrag_end)
 
         dele = tk.Label(row, text="✕", bg=BG_ROW, fg=BG_ROW, font=self.f_small,
                         cursor="hand2", width=2)
@@ -1622,6 +1637,80 @@ class TaskWidget:
         row.bind("<Enter>", lambda e, d=dele: d.config(fg=FG_DIM))
         row.bind("<Leave>", lambda e, d=dele: d.config(fg=BG_ROW))
         dele.bind("<Enter>", lambda e, d=dele: d.config(fg=OVERDUE))
+        return row
+
+    # ------------------------------------------------------------------ orden / reordenar
+    def _auto_order(self):
+        """Índices de self.tasks en el orden automático: hechas al final,
+        después por vencimiento y por prioridad."""
+        return sorted(
+            range(len(self.tasks)),
+            key=lambda i: (
+                self.tasks[i]["done"],
+                self.tasks[i].get("due") or "9999-99-99",
+                PRIO_RANK.get(self.tasks[i].get("priority", "media"), 1),
+            ),
+        )
+
+    def _auto_sort(self):
+        self.win["manual_order"] = False
+        self.save()
+        self.render()
+
+    def _freeze_order(self):
+        """Deja en self.tasks el orden que se ve ahora y activa el modo manual.
+        Como self._rows ya está en orden visual, después queda rows[k] ↔ tasks[k]."""
+        self.tasks[:] = [self.tasks[i] for i in self._auto_order()]
+        self.win["manual_order"] = True
+
+    def _rowdrag_start(self, e, row):
+        if self._editing or row not in self._rows:
+            return
+        self._rowdrag = {"row": row, "y": e.y_root, "moved": False}
+
+    def _rowdrag_motion(self, e):
+        d = self._rowdrag
+        if not d or d["row"] not in self._rows:
+            return
+        if not d["moved"]:
+            if abs(e.y_root - d["y"]) < 6:
+                return
+            d["moved"] = True
+            if not self.win.get("manual_order"):
+                self._freeze_order()
+            try:
+                d["row"].configure(bg=BG_ROW_HI)
+            except tk.TclError:
+                pass
+        cur = self._rows.index(d["row"])
+        tgt = self._row_at(e.y_root)
+        if tgt is not None and tgt != cur:
+            self.tasks.insert(tgt, self.tasks.pop(cur))
+            self._rows.insert(tgt, self._rows.pop(cur))
+            self._repack_rows()
+
+    def _rowdrag_end(self, _e=None):
+        d = self._rowdrag
+        self._rowdrag = None
+        if d and d["moved"]:
+            self.save()
+            self.render()
+
+    def _row_at(self, y_root):
+        """Índice visual de la ranura bajo el cursor."""
+        for pos, fr in enumerate(self._rows):
+            try:
+                if y_root < fr.winfo_rooty() + fr.winfo_height() / 2:
+                    return pos
+            except tk.TclError:
+                continue
+        return len(self._rows) - 1
+
+    def _repack_rows(self):
+        for fr in self._rows:
+            fr.pack_forget()
+        for fr in self._rows:
+            fr.pack(fill="x", padx=6, pady=2)
 
     # ------------------------------------------------------------------ edición inline
     def _edit_inline(self, idx, mid, field):
