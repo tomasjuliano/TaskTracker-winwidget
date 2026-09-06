@@ -198,6 +198,11 @@ if IS_WIN:
     u32.RegisterWindowMessageW.restype = wintypes.UINT
     _k32.CreateMutexW.argtypes = [ctypes.c_void_p, wintypes.BOOL, wintypes.LPCWSTR]
     _k32.CreateMutexW.restype = _H
+    try:
+        _shell32.SetCurrentProcessExplicitAppUserModelID.argtypes = [wintypes.LPCWSTR]
+        _shell32.SetCurrentProcessExplicitAppUserModelID.restype = ctypes.c_long
+    except AttributeError:
+        pass
 
     WM_SHOW = u32.RegisterWindowMessageW("TaskTracker.ShowWindow")   # id único por sesión
 
@@ -244,6 +249,27 @@ def win_dwm_flags(hwnd, dark):
             _dwm.DwmSetWindowAttribute(hwnd, attr, ctypes.byref(v), ctypes.sizeof(v))
         except OSError:
             pass
+
+
+def win_register_app_id(icon_path=None):
+    """AUMID explícito del proceso. Sin esto, los globos del tray se muestran
+    como el globo viejo y se pierden; con un AUMID registrado pasan a ser
+    toasts que quedan en el Centro de notificaciones (Win+N), con nombre e
+    icono propios. Solo escribe en HKCU (sin admin, sin accesos directos)."""
+    if not IS_WIN:
+        return
+    try:
+        _shell32.SetCurrentProcessExplicitAppUserModelID(APP_AUMID)
+    except (OSError, AttributeError):
+        pass
+    try:
+        with winreg.CreateKey(winreg.HKEY_CURRENT_USER,
+                              r"Software\Classes\AppUserModelId\%s" % APP_AUMID) as k:
+            winreg.SetValueEx(k, "DisplayName", 0, winreg.REG_SZ, APP_NAME)
+            if icon_path and os.path.exists(icon_path):
+                winreg.SetValueEx(k, "IconUri", 0, winreg.REG_SZ, icon_path)
+    except OSError:
+        pass
 
 
 # --------------------------------------------------------------------------- #
@@ -528,6 +554,7 @@ class Tray:
 
 
 APP_NAME = "TaskTracker"       # nombre para Windows (título, tray, Alt+Tab)
+APP_AUMID = "Tomasjuliano.TaskTracker"   # id para los toasts (Centro de notificaciones)
 
 # --------------------------------------------------------------------------- #
 #  Persistencia
@@ -1118,6 +1145,7 @@ class TaskWidget:
         if IS_WIN:
             threading.Thread(target=self._hotkey_loop, daemon=True).start()
             self.root.after(150, self._poll_summon)
+            self._register_toast()
             self.tray = Tray()
             self.root.after(400, self._poll_tray)
             self.root.after(600, self._sync_tray)
@@ -1180,8 +1208,11 @@ class TaskWidget:
 
     def _due_watch(self):
         """Cada 30 min: avisa (globo del tray) por tareas atrasadas o que vencen hoy."""
-        self._scan_due()
-        self._due_after = self.root.after(1_800_000, self._due_watch)
+        ready = bool(self.tray and self.tray.ok)
+        if ready:
+            self._scan_due()
+        # si el tray todavía no terminó de crearse, reintentar pronto
+        self._due_after = self.root.after(1_800_000 if ready else 5000, self._due_watch)
 
     def _scan_due(self):
         if not (self.win.get("due_alerts", True) and self.tray and self.tray.ok):
@@ -1224,6 +1255,13 @@ class TaskWidget:
             self.root.iconphoto(True, self._win_icon)
         except tk.TclError:
             pass
+
+    def _register_toast(self):
+        """(Re)registra el AUMID con el icono del tema actual, para que los
+        avisos de vencimiento queden en el Centro de notificaciones."""
+        if IS_WIN:
+            want = "dark" if CUR_THEME == "dark" else "light"
+            win_register_app_id(_tray_ico_file(want))
 
     # ------------------------------------------------------------------ UI
     def _build_header(self):
@@ -1784,6 +1822,7 @@ class TaskWidget:
             pass
         self.render()
         self._apply_win_icon()
+        self._register_toast()
         self._apply_glass()
         self._send_to_bottom()
         self.save()
@@ -2078,4 +2117,5 @@ class TaskWidget:
 
 if __name__ == "__main__":
     single_instance_or_exit()     # una sola instancia: la 2da avisa a la 1ra y sale
+    win_register_app_id()         # AUMID antes de crear ventanas (toasts que persisten)
     TaskWidget().run()
