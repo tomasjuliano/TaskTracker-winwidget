@@ -74,9 +74,9 @@ administrador y se puede desmarcar en cualquier momento.
 | Editar texto | Doble clic en el texto de la tarea |
 | Editar / poner fecha | Clic en la fecha de la tarea (o `＋ fecha`) |
 | Menú completo de una tarea | Clic derecho sobre la tarea |
-| Reordenar | Arrastrar desde la manija (⣿) de la izquierda de la fila (pasa a "orden manual"; enlace al pie para volver al automático) |
+| Reordenar | Pasar el mouse por la fila y arrastrar desde la manija de puntos de la izquierda (pasa a "orden manual"; enlace al pie para volver al automático) |
 | Elegir fecha con calendario | Iconito de calendario al lado de "venc." (o clic derecho en la tarea → "Fecha en calendario…") |
-| Borrar | Clic en la `✕` que aparece al pasar el mouse por la fila (`Ctrl+Z` / "Deshacer" para recuperar) |
+| Borrar | Pasar el mouse por la fila y clic en el tacho de la derecha (`Ctrl+Z` / "Deshacer" para recuperar) |
 | Limpiar completadas | Enlace "Limpiar N completadas" al pie de la lista |
 | Cambiar el atajo global | Opciones → "Atajo global" → "Cambiar…" y presionás la combinación |
 | Opciones (tema, atajo, iniciar con Windows, opacidad) | Botón `⚙` o clic derecho en la barra de título |
@@ -149,6 +149,11 @@ regenerarlo hay que rasterizar el SVG a PNG y armar el `.ico` con Pillow
 `assets/icon-dark.svg` es la variante para fondos claros / uso a futuro en un
 icono de bandeja.
 
+Los iconos de fila (manija, tacho, calendario) están en `assets/grip.svg`,
+`assets/trash.svg` y `assets/calendar.svg` (Lucide). Se rasterizan con
+anti-alias a PNG y se embeben en `_ICON_B64`; para regenerarlos:
+`python assets/gen_row_icons.py` y pegar la salida.
+
 ---
 
 ## Changelog
@@ -178,12 +183,16 @@ icono de bandeja.
   AppUserModelID propio en HKCU, así el aviso **queda guardado** en el Centro de
   notificaciones (`Win + N`) con nombre e icono propios — el globo clásico de la
   bandeja se borraba a los pocos segundos. (#10)
-- **Reordenar tareas arrastrando**: cada fila tiene una **manija** (⣿) a la
-  izquierda; al arrastrarla cambia el orden y activa el "orden manual" (se guarda
-  en `tasks.json`). Toggle en Opciones y enlace al pie para volver al automático. (#11)
+- **Reordenar tareas arrastrando**: al pasar el mouse por una fila aparece una
+  **manija** de puntos a la izquierda; se arrastra desde ahí para cambiar el
+  orden, que pasa a "manual" (se guarda en `tasks.json`). Toggle en Opciones y
+  enlace al pie para volver al automático. (#11)
 - **Mini calendario para el vencimiento**: iconito de calendario al lado de "venc."
   y opción "Fecha en calendario…" en el menú de cada tarea. Dibujado con tkinter
   (sin dependencias): mes navegable, "Hoy" y "Borrar". (#14)
+- Los iconos de fila (manija, tacho, calendario) son PNG con anti-alias generados
+  desde SVG (`assets/*.svg` + `assets/gen_row_icons.py`), no dibujos a mano en
+  Canvas. La manija y el tacho sólo se ven al pasar el mouse por la fila.
 - **Atajo global configurable**: en Opciones se captura la combinación y se guarda
   en `tasks.json`. Si el atajo está ocupado por otro programa, ahora se avisa en
   la propia UI (enlace al pie + estado en Opciones), no sólo por consola. (#16)

@@ -45,6 +45,7 @@ if IS_WIN:
     WS_EX_TOOLWINDOW = 0x00000080
     WS_EX_APPWINDOW  = 0x00040000
     HWND_BOTTOM      = 1
+    HWND_TOPMOST     = -1
     SWP_NOSIZE       = 0x0001
     SWP_NOMOVE       = 0x0002
     SWP_NOACTIVATE   = 0x0010
@@ -956,6 +957,80 @@ _ICON_B64 = {
         '/2DBHIowqi5uwbjSevt6pQCrZeLNZt6pjqNvwbNZ+BoE4o5DMQkFfLEIO8jWutKTSfo3HD49YyIAX+H6c1lrxT5ol7HDg/8BAAD/'
         '/68H3FMAAAAGSURBVAMAqIXlLb+V2DMAAAAASUVORK5CYII='
     ),
+    # grip (arrastrar la fila), tacho (borrar) y calendario — SVG rasterizado
+    # con anti-alias (assets/*, generado sin dependencias).
+    'dark_grip_idle': (
+        'iVBORw0KGgoAAAANSUhEUgAAABAAAAAaCAYAAAC+aNwHAAAAwUlEQVR42tXUsQ2CQBjF8SsIsbKwuIY4gQOYuIGVBQsQe2ew'
+        'xjgAqzABlXtQGhIaSMBX/E2M5kLxxYjFr3n58oDj7tz1cnYWbpYFiWzFv2SeLJkq2EgldylljZKsYiZYcJJBRukkRUc2MBMs'
+        'OEjDcC071GQNM8GChWRS8OQIKVnGzMx/YywrXv2ZRWTxVIHnW2+SyxI5WfG2Pz4KjtKz4q3s0ZL1zHyvwPwJ5kX8/T4wb2Xz'
+        'YTIfZ/OFYr7S/vBafwDa+NefliIFbwAAAABJRU5ErkJggg=='
+    ),
+    'dark_grip_hot': (
+        'iVBORw0KGgoAAAANSUhEUgAAABAAAAAaCAYAAAC+aNwHAAAAv0lEQVR42tXUsQ2CQBjF8SsIsbKwuIY4gQOYuIGVBQsQewdh'
+        'A1ZhAirnkFIxNJCAr/ibGM2F4osRi1/z8uUBx925++3iLNwsCxLZin/JPFkyVbCRSq5SyholWcVMsOAkg4zSSYqObGAmWHCQ'
+        'huFadqjJGmaCBQvJpODJEVKyjJmZ/8ZYVrz6M4vI4qkCz7eeJZclcrLibX98FBylZ8Vb2aMl65n5XoH5E8yL+Pt9YN7K5sNk'
+        'Ps7mC8V8pf3htf4A+3jPfdRAlxMAAAAASUVORK5CYII='
+    ),
+    'dark_trash_idle': (
+        'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAA1klEQVR42t3TPwqDMBgFcBEKLk4d7VYReoWewDWoa3Vy7g26'
+        'l85uPUJxd+tJBCeRHqIv8CIfaVI6d/iBPL88Ev8Et+slcEighJpKZh+zvsVPmGGimVniKwhhQxUXKDiQYlaJudAU6IszPGiA'
+        'F/Qi65kNItNrQlngWmiTRWuBKWl43oxbjMR2zXXGmUYewah5M4UtdHCkjlnKmdr1FmSBHPTl/16whxFONDL7uSDi17cjxexr'
+        'QQELtGK7tpYzhasghjsHJo+FM7Hvb9QfSy4eni3nzPo3vgEequlOBHLUogAAAABJRU5ErkJggg=='
+    ),
+    'dark_trash_hot': (
+        'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAA1ElEQVR42t3TPwqDMBgFcBEKLk4d7VYReoWewDVVlw7Vybmn'
+        'cesRirtbTyI4ifQO7Qu8yEealM4dfiDPL4/EP8HrfAocEiihppLZx6xv8QNmmGhmlvgKQthQxQUKDqSYVWIuNAX64gp3GuAJ'
+        'vch6ZoPI9JpQFrgW2mTRWmBKGp434xYjsV1znXGmkUcwat5MYQsdHKljlnKmdr0FWSAHffm/F+xhhAuNzH4uiPj17Ugx+1pQ'
+        'wAKt2K6t5UzhKojhxoHJY+FM7Psb9ceSi4dnyzmz/o1vfE3/TuDQhxgAAAAASUVORK5CYII='
+    ),
+    'dark_cal_idle': (
+        'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAA0ElEQVR42tXTMQqDQBQEUO0ESyvBLkLAG2jlFdKk3K21ywlS'
+        'CiF1TpHT5AJBBcHeA2QCY/j8uDGkS/EKv+Po7qJ3Ph09JYEdBGIWcJbovLwIYQMV3CGHlHLOKmZCXRDDFVroYYJOmXivZTaW'
+        'BXsY4QANgzVYqjlrmBn5zKvA8i3Pzy3gApFYXsRZwUzHZ94K5sBWrD9Vs8JVsLRul2mpQK/bZd4P69oDb8XHPfjjAgMDlAvH'
+        'p5XMGlmQwY031o5wYDaTBT4H5otjNMz6+m/8yQOuJeSMRtIv5wAAAABJRU5ErkJggg=='
+    ),
+    'dark_cal_hot': (
+        'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAzklEQVR42tXTMQqDQBQEUO0ESyvBLkLAG2gTr2CTcrfWLqfw'
+        'BjlFTuMFggYEe/tkAmP4/LgxpEvxCr/j6O6id+8OnpJABYGYBZwlOi8vQthBDVfIIaWcs5qZUBfEcIEebjDDoMy81zMby4Ij'
+        'THCClsEGLDWctcxMfOZVYPmW5+cWcIZILC/irGBm4DNvBUtgL9afqlnhKlhbt8u8VqDX7bLsh3Xtgbfh4x78cYGBEcqV49NK'
+        'Zo0syKDjja0jHJnNZIHPgfniGA2zvv4bf/IAhVpfmyGxFKcAAAAASUVORK5CYII='
+    ),
+    'light_grip_idle': (
+        'iVBORw0KGgoAAAANSUhEUgAAABAAAAAaCAYAAAC+aNwHAAAAwUlEQVR42tXUsQ2CQBjF8SsIsbKwuIY4gQOYuIGVBQsQewta'
+        'N2ADVmECKvegNCQ0kICv+JsYzYXiixGLX/Py5QHH3bk8vzoLt8iCRPbiXzJPlswV7KSWu1SyRUVWMxMsuMgok/SSoicbmQkW'
+        'nKRluJEDGrKWmWDBSjIpeXKElCxjZuG/MZYNr/7MIrJ4rsDzrTcpZI2CrHzbHx8FZxlY8U6O6MgGZr5XYP4E8yL+fh+Yt7L5'
+        'MJmPs/lCMV9pf3itPwC62nr/EP9EtgAAAABJRU5ErkJggg=='
+    ),
+    'light_grip_hot': (
+        'iVBORw0KGgoAAAANSUhEUgAAABAAAAAaCAYAAAC+aNwHAAAAv0lEQVR42tXUsQnCQBjF8StCsLKwuCYcDuAAghtYWWSBYO8g'
+        '2SCrZIJU7pFSAmkSiL7iL4hypPgQY/FrHh8vyeXuXAhbZ+EWWZDJXvxL5smyuYKdNHKTWgJqsoaZaMFFJrnLIDkGsomZaMFJ'
+        'OoZbOaAl65iJFqykkIonJ8jJCmYW/htT2fDqzywhS+cKPN96lVLWKMmqt/3xUXCWkRXv5YiebGTmewXmTzAv4u/3gXkrmw+T'
+        '+TibLxTzlfaH1/oDavjWAXdu3wEAAAAASUVORK5CYII='
+    ),
+    'light_trash_idle': (
+        'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAA1ElEQVR42t3TPwqDMBgFcBEKLk4d7VYReoWewDWoa+PkXNce'
+        'xK1HKO5uPYngJNJD9AVe5MMmpXOHH8jzyyPxT9C2t8AhgRI0lcw+Zn2LnzDDRDOzxFcQwo4qLlBwIsWsEnOhLTAXV3jQAC/o'
+        'RdYzG0Rm1oSywLVwSxatBbak5nkzbjES27XXGWdqeQRL82YKe+jgTB2zlDPa9RZkgRz05f9ecIQRLjQy+7kg4td3IMXsa0EB'
+        'CzRiu1sNZwpXQQx3DkweC2di399oPpZcPLytnDPr3/gGHV6wTpy+xDMAAAAASUVORK5CYII='
+    ),
+    'light_trash_hot': (
+        'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAA1ElEQVR42t3TPwqDMBgFcBEKLk6lk90qQq/QE7gGda1Ozj2N'
+        'W49Q3N16io6Ck4iH6Au8yEealM4dfiDPL4/EP8ErOAQOCZRQU8nsY9a3+AkzTDQzS3wFIeyo4gIFZ1LMKjEXmgJ9cYMHDbBC'
+        'L7Ke2SAyvSaUBa6FNlm0FZiShufNuMVIbNdcZ5xp5BGMmjdT2EMHF+qYpZypXW9BFshBX/7vBScY4Uojs58LIn59R1LMvhYU'
+        'sEArtmtrOVO4CmK4c2DyWDgT+/5G/bHk4uHZcs5sf+MbIxFATkjP0ywAAAAASUVORK5CYII='
+    ),
+    'light_cal_idle': (
+        'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAz0lEQVR42tXTMQqDQBQEUO0ESyvBLkLAG2jlFdKkXGvtts0F'
+        'vEFOkdPkAkEDgr0HyATG8PnZjSFdilf4HUd3FwNrT4GSwQEiMYs4y3ReXsSwgxZuUEJOJWctM7EuSOECA9xhgVFZeG9gNpUF'
+        'R5jBQs9gBw11nPXMzHzmVdDwLc/PreAMiVhewlnFzMhn3grWwF6sP1ezylfgWrfP4irQ6/ZZ96Px7UGw4eMe/HGBgQlqx/Fp'
+        'NbNGFhRw5Y2tI5yYLWRByIH54hgNs6H+G3/yAKzZq4znhW7LAAAAAElFTkSuQmCC'
+    ),
+    'light_cal_hot': (
+        'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAz0lEQVR42tXTMQ6CQBQEUOiIlFQkdJKYcAOouAKN5VJD5x1M'
+        'uIGn8DRewIAJCT29jslgfr67YuwsXsFnGNjd4G2Od09JoIJAzALOEp2XFyFsoYEr5JBSzlnDTKgLYjhDDzeYYVBm3uuZjWXB'
+        'HiY4QMdgCzW1nHXMTHzmVVDzLc/PLeAEkVhexFnBzMBn3gqWwE6sP1WzwlVgW7fLbCvQ63ZZ9qN27YG34uMe/HGBgRFKy/Fp'
+        'JbNGFmRw4Y21IxyZzWSBz4H54hgNs77+G3/yAGcm3Iyy7CD2AAAAAElFTkSuQmCC'
+    ),
 }
 
 
@@ -1595,7 +1670,8 @@ class TaskWidget:
         btn_add = make_icon(add, "plus", bg=BG_HEADER, command=lambda e: self.add_task())
         btn_add.pack(side="right", padx=(4, 6), pady=6)
 
-        cal_btn = self._cal_button(add, BG_HEADER, self._pick_due_for_new)
+        cal_btn = make_icon(add, "cal", bg=BG_HEADER,
+                            command=lambda e: self._pick_due_for_new())
         cal_btn.pack(side="right", padx=(0, 2), pady=6)
         self._tooltip(cal_btn, "Elegir la fecha en un calendario")
 
@@ -1696,14 +1772,15 @@ class TaskWidget:
         row = tk.Frame(self.rows_box, bg=BG_ROW)
         row.pack(fill="x", padx=6, pady=2)
 
-        grip = self._grip(row, BG_ROW)
-        grip.pack(side="left", padx=(2, 0))
+        grip = self._hover_icon(row, "grip")           # oculto hasta hover de la fila
+        grip.configure(cursor="fleur")
+        grip.pack(side="left", padx=(3, 0))
         self._tooltip(grip, "Arrastrá para reordenar")
 
         box = tk.Label(row, text="✔" if task["done"] else "○", bg=BG_ROW,
                        fg=ACCENT if task["done"] else FG_DIM,
                        font=self.f_body, cursor="hand2", width=2)
-        box.pack(side="left", padx=(2, 2), pady=4)
+        box.pack(side="left", padx=(3, 2), pady=4)
         box.bind("<Button-1>", lambda e, i=idx: self.toggle_done(i))
 
         dot = tk.Label(row, text="●", bg=BG_ROW,
@@ -1730,6 +1807,11 @@ class TaskWidget:
         due.bind("<Double-Button-1>", lambda e, i=idx, m=mid: self._edit_inline(i, m, "due"))
         due.bind("<Button-1>", lambda e, i=idx, m=mid: self._edit_inline(i, m, "due"))
 
+        dele = self._hover_icon(row, "trash",
+                                on_click=lambda e, i=idx: self.delete_task(i))
+        dele.pack(side="right", padx=5)
+        self._tooltip(dele, "Eliminar")
+
         for w in (row, mid, txt):
             w.bind("<Button-3>", lambda e, i=idx, m=mid: self._context_menu(e, i, m))
         for w in (row, grip):
@@ -1738,31 +1820,56 @@ class TaskWidget:
             w.bind("<ButtonRelease-1>", self._rowdrag_end)
         grip.bind("<Button-3>", lambda e, i=idx, m=mid: self._context_menu(e, i, m))
 
-        dele = tk.Label(row, text="✕", bg=BG_ROW, fg=BG_ROW, font=self.f_small,
-                        cursor="hand2", width=2)
-        dele.pack(side="right", padx=4)
-        dele.bind("<Button-1>", lambda e, i=idx: self.delete_task(i))
-        row.bind("<Enter>", lambda e, d=dele, g=grip: (d.config(fg=FG_DIM), g._paint(FG)))
-        row.bind("<Leave>", lambda e, d=dele, g=grip: (d.config(fg=BG_ROW), g._paint(FG_DIM)))
-        dele.bind("<Enter>", lambda e, d=dele: d.config(fg=OVERDUE))
+        self._bind_row_hover(row, (grip, dele))
         return row
 
-    # ------------------------------------------------------------------ orden / reordenar
-    def _grip(self, parent, bg):
-        """Manija de 6 puntitos para agarrar y arrastrar la fila."""
-        g = tk.Canvas(parent, width=12, height=24, bg=bg,
-                      highlightthickness=0, cursor="fleur")
+    # ------------------------------------------------------------------ iconos de fila
+    def _hover_icon(self, parent, name, on_click=None):
+        """Label con icono PNG que arranca invisible; _reveal()/_conceal() lo
+        muestran/ocultan (para que grip y tacho sólo aparezcan al pasar el
+        mouse por la fila). Hover propio → variante 'hot'."""
+        idle = _get_icon(f"{CUR_THEME}_{name}_idle")
+        hot = _get_icon(f"{CUR_THEME}_{name}_hot")
+        blank = tk.PhotoImage(width=idle.width(), height=idle.height())
+        lbl = tk.Label(parent, image=blank, bg=BG_ROW, bd=0,
+                       highlightthickness=0, cursor="hand2", takefocus=0)
+        lbl._imgs = (blank, idle, hot)           # referencias vivas (evita el GC)
+        st = {"on": False}
 
-        def paint(color):
-            g.delete("all")
-            for cx in (4, 8):
-                for cy in (7, 12, 17):
-                    g.create_oval(cx - 1, cy - 1, cx + 1, cy + 1,
-                                  fill=color, outline=color)
+        def reveal():
+            st["on"] = True
+            lbl.configure(image=idle)
 
-        g._paint = paint
-        paint(FG_DIM)
-        return g
+        def conceal():
+            st["on"] = False
+            lbl.configure(image=blank)
+
+        lbl._reveal, lbl._conceal = reveal, conceal
+        lbl.bind("<Enter>", lambda e: st["on"] and lbl.configure(image=hot))
+        lbl.bind("<Leave>", lambda e: st["on"] and lbl.configure(image=idle))
+        if on_click:
+            lbl.bind("<Button-1>", on_click)
+        return lbl
+
+    def _bind_row_hover(self, row, icons):
+        """Muestra los iconos mientras el mouse esté en cualquier parte de la fila."""
+        def enter(_=None):
+            for ic in icons:
+                ic._reveal()
+
+        def leave(_=None):
+            x, y = row.winfo_pointerxy()
+            w = row.winfo_containing(x, y)
+            while w is not None:
+                if w is row:
+                    return                       # sigue dentro de la fila
+                w = getattr(w, "master", None)
+            for ic in icons:
+                ic._conceal()
+
+        for w in (row,) + tuple(row.winfo_children()):
+            w.bind("<Enter>", enter, add="+")
+            w.bind("<Leave>", leave, add="+")
 
     def _auto_order(self):
         """Índices de self.tasks en el orden automático: hechas al final,
@@ -1837,27 +1944,6 @@ class TaskWidget:
             fr.pack(fill="x", padx=6, pady=2)
 
     # ------------------------------------------------------------------ calendario
-    def _cal_button(self, parent, bg, command):
-        """Iconito de calendario dibujado (sin dependencias)."""
-        c = tk.Canvas(parent, width=16, height=16, bg=bg, highlightthickness=0,
-                      cursor="hand2")
-
-        def draw(color):
-            c.delete("all")
-            c.create_rectangle(2, 3, 13, 13, outline=color)
-            c.create_line(2, 6, 13, 6, fill=color)
-            c.create_line(5, 2, 5, 4, fill=color)
-            c.create_line(10, 2, 10, 4, fill=color)
-            for gx in (4, 7, 10):
-                for gy in (8, 11):
-                    c.create_rectangle(gx, gy, gx + 1, gy + 1, outline=color)
-
-        draw(FG_DIM)
-        c.bind("<Enter>", lambda e: draw(ACCENT))
-        c.bind("<Leave>", lambda e: draw(FG_DIM))
-        c.bind("<Button-1>", lambda e: command())
-        return c
-
     def _pick_due_for_new(self):
         cur = "" if self._is_placeholder(self.e_due) else parse_due(self.e_due.get())
 
@@ -1899,7 +1985,6 @@ class TaskWidget:
         top = tk.Toplevel(self.root)
         self._cal = top
         top.overrideredirect(True)
-        top.transient(self.root)
         top.attributes("-topmost", True)
         top.configure(bg=BORDER)
         outer = tk.Frame(top, bg=BG)
@@ -1915,6 +2000,7 @@ class TaskWidget:
         def close():
             self._cal = None
             try:
+                top.grab_release()
                 top.destroy()
             except tk.TclError:
                 pass
@@ -1989,7 +2075,30 @@ class TaskWidget:
         top.geometry(f"+{x}+{y}")
         top.bind("<Escape>", lambda e: close())
         top.bind("<FocusOut>", lambda e: top.after(120, self._cal_autoclose))
+
+        def _maybe_dismiss(e):
+            # el clic que abrió el calendario no debe cerrarlo
+            if not getattr(top, "_ready", False):
+                return
+            if not (0 <= e.x < top.winfo_width() and 0 <= e.y < top.winfo_height()):
+                close()
+
+        top._ready = False
+        top.after(300, lambda: setattr(top, "_ready", True))
+        top.bind("<Button-1>", _maybe_dismiss)     # con el grab, un clic afuera llega acá
+        top.lift()
         top.focus_force()
+        if IS_WIN:                       # el widget vive al fondo del z-order: forzar arriba
+            try:
+                hwnd = u32.GetAncestor(top.winfo_id(), GA_ROOT)
+                u32.SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0,
+                                 SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE)
+            except OSError:
+                pass
+        try:
+            top.grab_set()               # los clics afuera cierran el calendario
+        except tk.TclError:
+            pass
 
     def _cal_autoclose(self):
         top = getattr(self, "_cal", None)
